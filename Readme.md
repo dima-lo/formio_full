@@ -18,7 +18,7 @@ MongoDB and Redis may be on separate servers. The only thing that is required is
 To install the server first pull in the repo from github. Be sure to set your SSH key in github if you haven't already.
 
 ```bash
-npm ci
+npm ci --production
 ```
 (npm ci is like npm install but will install from package-lock.json for a more reproducible list of dependencies)
 
@@ -44,6 +44,6 @@ To upgrade, simply do the following if you checked it out with git:
 
 ```bash
 git pull
-npm ci
+npm ci --production
 node main
 ```
