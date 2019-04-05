@@ -1,31 +1,31 @@
 {
   "_args": [
     [
-      "ckeditor@4.11.3",
+      "ckeditor@4.11.2",
       "/home/circleci/project"
     ]
   ],
-  "_from": "ckeditor@4.11.3",
-  "_id": "ckeditor@4.11.3",
+  "_from": "ckeditor@4.11.2",
+  "_id": "ckeditor@4.11.2",
   "_inBundle": false,
-  "_integrity": "sha512-v6G+v16WAcukKuQH6m+trA9RCOQntFM2nxPO/GFiLYsdD/5IbZAZ2n7GwMxQmxDXpx4AixpnMWF+yAE1t9wq6Q==",
+  "_integrity": "sha512-/qNERAeYsUAnfzEJZAOOI0sVpHk++W6BchCDmJ8+MbDPHq1Tr3jI/1PA9Qw3qSRXazud2T1yHXURfRUI+GT0FA==",
   "_location": "/ckeditor",
   "_phantomChildren": {},
   "_requested": {
     "type": "version",
     "registry": true,
-    "raw": "ckeditor@4.11.3",
+    "raw": "ckeditor@4.11.2",
     "name": "ckeditor",
     "escapedName": "ckeditor",
-    "rawSpec": "4.11.3",
+    "rawSpec": "4.11.2",
     "saveSpec": null,
-    "fetchSpec": "4.11.3"
+    "fetchSpec": "4.11.2"
   },
   "_requiredBy": [
     "/"
   ],
-  "_resolved": "https://registry.npmjs.org/ckeditor/-/ckeditor-4.11.3.tgz",
-  "_spec": "4.11.3",
+  "_resolved": "https://registry.npmjs.org/ckeditor/-/ckeditor-4.11.2.tgz",
+  "_spec": "4.11.2",
   "_where": "/home/circleci/project",
   "author": {
     "name": "CKSource",
@@ -53,5 +53,5 @@
     "type": "git",
     "url": "git+https://github.com/ckeditor/ckeditor-releases.git"
   },
-  "version": "4.11.3"
+  "version": "4.11.2"
 }
