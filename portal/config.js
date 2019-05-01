@@ -7,6 +7,7 @@ var pathType = 'Subdomains';
 var onPremise = false;
 var hostedPDFServer = '';
 var sso = '';
+var ssoLogout = '';
 /*******************************/
 
 // Parse query string
@@ -69,18 +70,20 @@ if (Formio) {
   Formio.setBaseUrl(apiBase);
   Formio.setProjectUrl(formioBase);
   if (sso) {
-    var token = Formio.getToken();
-    loading = Formio.ssoInit(sso);
-    if (!loading && !token) {
+    loading = Formio.ssoInit(sso, {
+      forceAuth: true
+    });
+    if (!loading) {
       // We are starting the handshake process with SSO, disable the app for now.
       disable = true;
     }
   }
 }
 angular.module('formioApp').constant('AppConfig', {
-  appVersion: '6.3.5',
+  appVersion: '6.4.0',
   copyrightYear: (new Date()).getFullYear().toString(),
   sso: sso,
+  ssoLogout: ssoLogout,
   loading: loading,
   disable: disable,
   pathType: pathType,

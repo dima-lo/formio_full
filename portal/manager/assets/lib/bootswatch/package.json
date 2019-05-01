@@ -2,7 +2,7 @@
   "_args": [
     [
       "bootswatch@4.3.1",
-      "/Users/travistidwell/Desktop/formmanager"
+      "/Users/travistidwell/Documents/formio/formio-apps/formmanager"
     ]
   ],
   "_from": "bootswatch@4.3.1",
@@ -27,7 +27,7 @@
   ],
   "_resolved": "https://registry.npmjs.org/bootswatch/-/bootswatch-4.3.1.tgz",
   "_spec": "4.3.1",
-  "_where": "/Users/travistidwell/Desktop/formmanager",
+  "_where": "/Users/travistidwell/Documents/formio/formio-apps/formmanager",
   "author": {
     "name": "Thomas Park"
   },
