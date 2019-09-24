@@ -88,7 +88,7 @@ if (Formio) {
   }
 }
 angular.module('formioApp').constant('AppConfig', {
-  appVersion: '6.8.1',
+  appVersion: '6.8.2',
   copyrightYear: (new Date()).getFullYear().toString(),
   sso: sso,
   ssoLogout: ssoLogout,
