@@ -7,6 +7,7 @@ var pathType = 'Subdomains';
 var onPremise = false;
 var hostedPDFServer = '';
 var sso = '';
+var ssoTeamsEnabled = false;
 var ssoLogout = '';
 /*******************************/
 
@@ -39,7 +40,7 @@ if (query['x-jwt-token']) {
 }
 
 var parts = host.split('.');
-if (parts[0] === 'portal' || parts[0] === 'beta') {
+if (parts[0] === 'portal' || parts[0] === 'beta'|| parts[0] === 'alpha' || parts[0] === 'next' || parts[0] === 'edge') {
   parts.shift();
   host = parts.join('.');
 }
@@ -69,7 +70,7 @@ var loading = false;
 if (Formio) {
   Formio.setBaseUrl(apiBase);
   Formio.setProjectUrl(formioBase);
-  if (sso) {
+  if (sso && query.skipSsoAuth !== 'true') {
     if (query.saml) {
       window.location.hash = localStorage.getItem('redirectUrl');
       localStorage.removeItem('redirectUrl');
@@ -88,9 +89,10 @@ if (Formio) {
   }
 }
 angular.module('formioApp').constant('AppConfig', {
-  appVersion: '6.8.9',
+  appVersion: '7.0.0-rc.62',
   copyrightYear: (new Date()).getFullYear().toString(),
   sso: sso,
+  ssoTeamsEnabled: ssoTeamsEnabled,
   ssoLogout: ssoLogout,
   loading: loading,
   disable: disable,
