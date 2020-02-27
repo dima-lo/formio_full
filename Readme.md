@@ -7,7 +7,7 @@ Please be aware that installing and upgrading dependencies is your responsibilit
 
 ## Requirements
 This server has the following requirements:
-  - Node.js 8.x or later
+  - Node.js 12.x or later
   - npm 5.7.1 or later
   - MongoDB 3.6 or later
   - Redis
