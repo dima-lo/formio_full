@@ -31,7 +31,7 @@ For options see [https://help.form.io/userguide/environments/#environments-varia
 To run the server simply run:
 
 ```bash
-node main
+node formio
 ```
 
 ## SSL and DNS
@@ -45,5 +45,5 @@ To upgrade, simply do the following if you checked it out with git:
 ```bash
 git pull
 npm ci --production
-node main
+node formio
 ```
