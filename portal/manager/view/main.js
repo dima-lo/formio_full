@@ -43,7 +43,7 @@ module.exports = function (it) {
 
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 var create = __webpack_require__(/*! ../internals/object-create */ "./node_modules/core-js/internals/object-create.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var definePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
 
 var UNSCOPABLES = wellKnownSymbol('unscopables');
 var ArrayPrototype = Array.prototype;
@@ -51,7 +51,10 @@ var ArrayPrototype = Array.prototype;
 // Array.prototype[@@unscopables]
 // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
 if (ArrayPrototype[UNSCOPABLES] == undefined) {
-  hide(ArrayPrototype, UNSCOPABLES, create(null));
+  definePropertyModule.f(ArrayPrototype, UNSCOPABLES, {
+    configurable: true,
+    value: create(null)
+  });
 }
 
 // add a key to Array.prototype[@@unscopables]
@@ -196,11 +199,15 @@ module.exports = function fill(value /* , start = 0, end = @length */) {
 "use strict";
 
 var $forEach = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").forEach;
-var sloppyArrayMethod = __webpack_require__(/*! ../internals/sloppy-array-method */ "./node_modules/core-js/internals/sloppy-array-method.js");
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var STRICT_METHOD = arrayMethodIsStrict('forEach');
+var USES_TO_LENGTH = arrayMethodUsesToLength('forEach');
 
 // `Array.prototype.forEach` method implementation
 // https://tc39.github.io/ecma262/#sec-array.prototype.foreach
-module.exports = sloppyArrayMethod('forEach') ? function forEach(callbackfn /* , thisArg */) {
+module.exports = (!STRICT_METHOD || !USES_TO_LENGTH) ? function forEach(callbackfn /* , thisArg */) {
   return $forEach(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
 } : [].forEach;
 
@@ -216,7 +223,7 @@ module.exports = sloppyArrayMethod('forEach') ? function forEach(callbackfn /* ,
 
 "use strict";
 
-var bind = __webpack_require__(/*! ../internals/bind-context */ "./node_modules/core-js/internals/bind-context.js");
+var bind = __webpack_require__(/*! ../internals/function-bind-context */ "./node_modules/core-js/internals/function-bind-context.js");
 var toObject = __webpack_require__(/*! ../internals/to-object */ "./node_modules/core-js/internals/to-object.js");
 var callWithSafeIterationClosing = __webpack_require__(/*! ../internals/call-with-safe-iteration-closing */ "./node_modules/core-js/internals/call-with-safe-iteration-closing.js");
 var isArrayIteratorMethod = __webpack_require__(/*! ../internals/is-array-iterator-method */ "./node_modules/core-js/internals/is-array-iterator-method.js");
@@ -232,25 +239,25 @@ module.exports = function from(arrayLike /* , mapfn = undefined, thisArg = undef
   var argumentsLength = arguments.length;
   var mapfn = argumentsLength > 1 ? arguments[1] : undefined;
   var mapping = mapfn !== undefined;
-  var index = 0;
   var iteratorMethod = getIteratorMethod(O);
-  var length, result, step, iterator;
+  var index = 0;
+  var length, result, step, iterator, next, value;
   if (mapping) mapfn = bind(mapfn, argumentsLength > 2 ? arguments[2] : undefined, 2);
   // if the target is not iterable or it's an array with the default iterator - use a simple case
   if (iteratorMethod != undefined && !(C == Array && isArrayIteratorMethod(iteratorMethod))) {
     iterator = iteratorMethod.call(O);
+    next = iterator.next;
     result = new C();
-    for (;!(step = iterator.next()).done; index++) {
-      createProperty(result, index, mapping
-        ? callWithSafeIterationClosing(iterator, mapfn, [step.value, index], true)
-        : step.value
-      );
+    for (;!(step = next.call(iterator)).done; index++) {
+      value = mapping ? callWithSafeIterationClosing(iterator, mapfn, [step.value, index], true) : step.value;
+      createProperty(result, index, value);
     }
   } else {
     length = toLength(O.length);
     result = new C(length);
     for (;length > index; index++) {
-      createProperty(result, index, mapping ? mapfn(O[index], index) : O[index]);
+      value = mapping ? mapfn(O[index], index) : O[index];
+      createProperty(result, index, value);
     }
   }
   result.length = index;
@@ -310,7 +317,7 @@ module.exports = {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-var bind = __webpack_require__(/*! ../internals/bind-context */ "./node_modules/core-js/internals/bind-context.js");
+var bind = __webpack_require__(/*! ../internals/function-bind-context */ "./node_modules/core-js/internals/function-bind-context.js");
 var IndexedObject = __webpack_require__(/*! ../internals/indexed-object */ "./node_modules/core-js/internals/indexed-object.js");
 var toObject = __webpack_require__(/*! ../internals/to-object */ "./node_modules/core-js/internals/to-object.js");
 var toLength = __webpack_require__(/*! ../internals/to-length */ "./node_modules/core-js/internals/to-length.js");
@@ -391,16 +398,20 @@ module.exports = {
 var toIndexedObject = __webpack_require__(/*! ../internals/to-indexed-object */ "./node_modules/core-js/internals/to-indexed-object.js");
 var toInteger = __webpack_require__(/*! ../internals/to-integer */ "./node_modules/core-js/internals/to-integer.js");
 var toLength = __webpack_require__(/*! ../internals/to-length */ "./node_modules/core-js/internals/to-length.js");
-var sloppyArrayMethod = __webpack_require__(/*! ../internals/sloppy-array-method */ "./node_modules/core-js/internals/sloppy-array-method.js");
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
 
 var min = Math.min;
 var nativeLastIndexOf = [].lastIndexOf;
 var NEGATIVE_ZERO = !!nativeLastIndexOf && 1 / [1].lastIndexOf(1, -0) < 0;
-var SLOPPY_METHOD = sloppyArrayMethod('lastIndexOf');
+var STRICT_METHOD = arrayMethodIsStrict('lastIndexOf');
+// For preventing possible almost infinite loop in non-standard implementations, test the forward version of the method
+var USES_TO_LENGTH = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
+var FORCED = NEGATIVE_ZERO || !STRICT_METHOD || !USES_TO_LENGTH;
 
 // `Array.prototype.lastIndexOf` method implementation
 // https://tc39.github.io/ecma262/#sec-array.prototype.lastindexof
-module.exports = (NEGATIVE_ZERO || SLOPPY_METHOD) ? function lastIndexOf(searchElement /* , fromIndex = @[*-1] */) {
+module.exports = FORCED ? function lastIndexOf(searchElement /* , fromIndex = @[*-1] */) {
   // convert -0 to +0
   if (NEGATIVE_ZERO) return nativeLastIndexOf.apply(this, arguments) || 0;
   var O = toIndexedObject(this);
@@ -424,17 +435,81 @@ module.exports = (NEGATIVE_ZERO || SLOPPY_METHOD) ? function lastIndexOf(searchE
 
 var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
+var V8_VERSION = __webpack_require__(/*! ../internals/engine-v8-version */ "./node_modules/core-js/internals/engine-v8-version.js");
 
 var SPECIES = wellKnownSymbol('species');
 
 module.exports = function (METHOD_NAME) {
-  return !fails(function () {
+  // We can't use this feature detection in V8 since it causes
+  // deoptimization and serious performance degradation
+  // https://github.com/zloirock/core-js/issues/677
+  return V8_VERSION >= 51 || !fails(function () {
     var array = [];
     var constructor = array.constructor = {};
     constructor[SPECIES] = function () {
       return { foo: 1 };
     };
     return array[METHOD_NAME](Boolean).foo !== 1;
+  });
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/internals/array-method-is-strict.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/core-js/internals/array-method-is-strict.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+
+module.exports = function (METHOD_NAME, argument) {
+  var method = [][METHOD_NAME];
+  return !!method && fails(function () {
+    // eslint-disable-next-line no-useless-call,no-throw-literal
+    method.call(null, argument || function () { throw 1; }, 1);
+  });
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/internals/array-method-uses-to-length.js":
+/*!***********************************************************************!*\
+  !*** ./node_modules/core-js/internals/array-method-uses-to-length.js ***!
+  \***********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
+var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
+
+var defineProperty = Object.defineProperty;
+var cache = {};
+
+var thrower = function (it) { throw it; };
+
+module.exports = function (METHOD_NAME, options) {
+  if (has(cache, METHOD_NAME)) return cache[METHOD_NAME];
+  if (!options) options = {};
+  var method = [][METHOD_NAME];
+  var ACCESSORS = has(options, 'ACCESSORS') ? options.ACCESSORS : false;
+  var argument0 = has(options, 0) ? options[0] : thrower;
+  var argument1 = has(options, 1) ? options[1] : undefined;
+
+  return cache[METHOD_NAME] = !!method && !fails(function () {
+    if (ACCESSORS && !DESCRIPTORS) return true;
+    var O = { length: -1 };
+
+    if (ACCESSORS) defineProperty(O, 1, { enumerable: true, get: thrower });
+    else O[1] = 1;
+
+    method.call(O, argument0, argument1);
   });
 };
 
@@ -518,41 +593,6 @@ module.exports = function (originalArray, length) {
       if (C === null) C = undefined;
     }
   } return new (C === undefined ? Array : C)(length === 0 ? 0 : length);
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/core-js/internals/bind-context.js":
-/*!********************************************************!*\
-  !*** ./node_modules/core-js/internals/bind-context.js ***!
-  \********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var aFunction = __webpack_require__(/*! ../internals/a-function */ "./node_modules/core-js/internals/a-function.js");
-
-// optional / simple context binding
-module.exports = function (fn, that, length) {
-  aFunction(fn);
-  if (that === undefined) return fn;
-  switch (length) {
-    case 0: return function () {
-      return fn.call(that);
-    };
-    case 1: return function (a) {
-      return fn.call(that, a);
-    };
-    case 2: return function (a, b) {
-      return fn.call(that, a, b);
-    };
-    case 3: return function (a, b, c) {
-      return fn.call(that, a, b, c);
-    };
-  }
-  return function (/* ...args */) {
-    return fn.apply(that, arguments);
-  };
 };
 
 
@@ -654,6 +694,7 @@ module.exports = function (it) {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
+var TO_STRING_TAG_SUPPORT = __webpack_require__(/*! ../internals/to-string-tag-support */ "./node_modules/core-js/internals/to-string-tag-support.js");
 var classofRaw = __webpack_require__(/*! ../internals/classof-raw */ "./node_modules/core-js/internals/classof-raw.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 
@@ -669,7 +710,7 @@ var tryGet = function (it, key) {
 };
 
 // getting tag from ES6+ `Object.prototype.toString`
-module.exports = function (it) {
+module.exports = TO_STRING_TAG_SUPPORT ? classofRaw : function (it) {
   var O, tag, result;
   return it === undefined ? 'Undefined' : it === null ? 'Null'
     // @@toStringTag case
@@ -780,6 +821,27 @@ module.exports = function (IteratorConstructor, NAME, next) {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/create-non-enumerable-property.js":
+/*!**************************************************************************!*\
+  !*** ./node_modules/core-js/internals/create-non-enumerable-property.js ***!
+  \**************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
+var definePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
+var createPropertyDescriptor = __webpack_require__(/*! ../internals/create-property-descriptor */ "./node_modules/core-js/internals/create-property-descriptor.js");
+
+module.exports = DESCRIPTORS ? function (object, key, value) {
+  return definePropertyModule.f(object, key, createPropertyDescriptor(1, value));
+} : function (object, key, value) {
+  object[key] = value;
+  return object;
+};
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/create-property-descriptor.js":
 /*!**********************************************************************!*\
   !*** ./node_modules/core-js/internals/create-property-descriptor.js ***!
@@ -835,7 +897,7 @@ var createIteratorConstructor = __webpack_require__(/*! ../internals/create-iter
 var getPrototypeOf = __webpack_require__(/*! ../internals/object-get-prototype-of */ "./node_modules/core-js/internals/object-get-prototype-of.js");
 var setPrototypeOf = __webpack_require__(/*! ../internals/object-set-prototype-of */ "./node_modules/core-js/internals/object-set-prototype-of.js");
 var setToStringTag = __webpack_require__(/*! ../internals/set-to-string-tag */ "./node_modules/core-js/internals/set-to-string-tag.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 var IS_PURE = __webpack_require__(/*! ../internals/is-pure */ "./node_modules/core-js/internals/is-pure.js");
@@ -882,7 +944,7 @@ module.exports = function (Iterable, NAME, IteratorConstructor, next, DEFAULT, I
         if (setPrototypeOf) {
           setPrototypeOf(CurrentIteratorPrototype, IteratorPrototype);
         } else if (typeof CurrentIteratorPrototype[ITERATOR] != 'function') {
-          hide(CurrentIteratorPrototype, ITERATOR, returnThis);
+          createNonEnumerableProperty(CurrentIteratorPrototype, ITERATOR, returnThis);
         }
       }
       // Set @@toStringTag to native iterators
@@ -899,7 +961,7 @@ module.exports = function (Iterable, NAME, IteratorConstructor, next, DEFAULT, I
 
   // define iterator
   if ((!IS_PURE || FORCED) && IterablePrototype[ITERATOR] !== defaultIterator) {
-    hide(IterablePrototype, ITERATOR, defaultIterator);
+    createNonEnumerableProperty(IterablePrototype, ITERATOR, defaultIterator);
   }
   Iterators[NAME] = defaultIterator;
 
@@ -932,7 +994,7 @@ module.exports = function (Iterable, NAME, IteratorConstructor, next, DEFAULT, I
 
 var path = __webpack_require__(/*! ../internals/path */ "./node_modules/core-js/internals/path.js");
 var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
-var wrappedWellKnownSymbolModule = __webpack_require__(/*! ../internals/wrapped-well-known-symbol */ "./node_modules/core-js/internals/wrapped-well-known-symbol.js");
+var wrappedWellKnownSymbolModule = __webpack_require__(/*! ../internals/well-known-symbol-wrapped */ "./node_modules/core-js/internals/well-known-symbol-wrapped.js");
 var defineProperty = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js").f;
 
 module.exports = function (NAME) {
@@ -956,7 +1018,7 @@ var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-j
 
 // Thank's IE8 for his funny defineProperty
 module.exports = !fails(function () {
-  return Object.defineProperty({}, 'a', { get: function () { return 7; } }).a != 7;
+  return Object.defineProperty({}, 1, { get: function () { return 7; } })[1] != 7;
 });
 
 
@@ -1029,6 +1091,51 @@ module.exports = {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/engine-user-agent.js":
+/*!*************************************************************!*\
+  !*** ./node_modules/core-js/internals/engine-user-agent.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var getBuiltIn = __webpack_require__(/*! ../internals/get-built-in */ "./node_modules/core-js/internals/get-built-in.js");
+
+module.exports = getBuiltIn('navigator', 'userAgent') || '';
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/internals/engine-v8-version.js":
+/*!*************************************************************!*\
+  !*** ./node_modules/core-js/internals/engine-v8-version.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+var userAgent = __webpack_require__(/*! ../internals/engine-user-agent */ "./node_modules/core-js/internals/engine-user-agent.js");
+
+var process = global.process;
+var versions = process && process.versions;
+var v8 = versions && versions.v8;
+var match, version;
+
+if (v8) {
+  match = v8.split('.');
+  version = match[0] + match[1];
+} else if (userAgent) {
+  match = userAgent.match(/Edge\/(\d+)/);
+  if (!match || match[1] >= 74) {
+    match = userAgent.match(/Chrome\/(\d+)/);
+    if (match) version = match[1];
+  }
+}
+
+module.exports = version && +version;
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/enum-bug-keys.js":
 /*!*********************************************************!*\
   !*** ./node_modules/core-js/internals/enum-bug-keys.js ***!
@@ -1059,7 +1166,7 @@ module.exports = [
 
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
 var getOwnPropertyDescriptor = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js").f;
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var setGlobal = __webpack_require__(/*! ../internals/set-global */ "./node_modules/core-js/internals/set-global.js");
 var copyConstructorProperties = __webpack_require__(/*! ../internals/copy-constructor-properties */ "./node_modules/core-js/internals/copy-constructor-properties.js");
@@ -1105,7 +1212,7 @@ module.exports = function (options, source) {
     }
     // add a flag to not completely full polyfills
     if (options.sham || (targetProperty && targetProperty.sham)) {
-      hide(sourceProperty, 'sham', true);
+      createNonEnumerableProperty(sourceProperty, 'sham', true);
     }
     // extend global
     redefine(target, key, sourceProperty, options);
@@ -1142,11 +1249,13 @@ module.exports = function (exec) {
 
 "use strict";
 
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+// TODO: Remove from `core-js@4` since it's moved to entry points
+__webpack_require__(/*! ../modules/es.regexp.exec */ "./node_modules/core-js/modules/es.regexp.exec.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 var regexpExec = __webpack_require__(/*! ../internals/regexp-exec */ "./node_modules/core-js/internals/regexp-exec.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 
 var SPECIES = wellKnownSymbol('species');
 
@@ -1162,6 +1271,21 @@ var REPLACE_SUPPORTS_NAMED_GROUPS = !fails(function () {
   };
   return ''.replace(re, '$<a>') !== '7';
 });
+
+// IE <= 11 replaces $0 with the whole match, as if it was $&
+// https://stackoverflow.com/questions/6024666/getting-ie-to-replace-a-regex-with-the-literal-string-0
+var REPLACE_KEEPS_$0 = (function () {
+  return 'a'.replace(/./, '$0') === '$0';
+})();
+
+var REPLACE = wellKnownSymbol('replace');
+// Safari <= 13.0.3(?) substitutes nth capture where n>m with an empty string
+var REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE = (function () {
+  if (/./[REPLACE]) {
+    return /./[REPLACE]('a', '$0') === '';
+  }
+  return false;
+})();
 
 // Chrome 51 has a buggy "split" implementation when RegExp#exec !== nativeExec
 // Weex JS has frozen built-in prototypes, so use try / catch wrapper
@@ -1187,14 +1311,21 @@ module.exports = function (KEY, length, exec, sham) {
     // Symbol-named RegExp methods call .exec
     var execCalled = false;
     var re = /a/;
-    re.exec = function () { execCalled = true; return null; };
 
     if (KEY === 'split') {
+      // We can't use real regex here since it causes deoptimization
+      // and serious performance degradation in V8
+      // https://github.com/zloirock/core-js/issues/306
+      re = {};
       // RegExp[@@split] doesn't call the regex's exec method, but first creates
       // a new one. We need to return the patched regex when creating the new one.
       re.constructor = {};
       re.constructor[SPECIES] = function () { return re; };
+      re.flags = '';
+      re[SYMBOL] = /./[SYMBOL];
     }
+
+    re.exec = function () { execCalled = true; return null; };
 
     re[SYMBOL]('');
     return !execCalled;
@@ -1203,7 +1334,11 @@ module.exports = function (KEY, length, exec, sham) {
   if (
     !DELEGATES_TO_SYMBOL ||
     !DELEGATES_TO_EXEC ||
-    (KEY === 'replace' && !REPLACE_SUPPORTS_NAMED_GROUPS) ||
+    (KEY === 'replace' && !(
+      REPLACE_SUPPORTS_NAMED_GROUPS &&
+      REPLACE_KEEPS_$0 &&
+      !REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE
+    )) ||
     (KEY === 'split' && !SPLIT_WORKS_WITH_OVERWRITTEN_EXEC)
   ) {
     var nativeRegExpMethod = /./[SYMBOL];
@@ -1218,6 +1353,9 @@ module.exports = function (KEY, length, exec, sham) {
         return { done: true, value: nativeMethod.call(str, regexp, arg2) };
       }
       return { done: false };
+    }, {
+      REPLACE_KEEPS_$0: REPLACE_KEEPS_$0,
+      REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE: REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE
     });
     var stringMethod = methods[0];
     var regexMethod = methods[1];
@@ -1231,31 +1369,44 @@ module.exports = function (KEY, length, exec, sham) {
       // 21.2.5.9 RegExp.prototype[@@search](string)
       : function (string) { return regexMethod.call(string, this); }
     );
-    if (sham) hide(RegExp.prototype[SYMBOL], 'sham', true);
   }
+
+  if (sham) createNonEnumerableProperty(RegExp.prototype[SYMBOL], 'sham', true);
 };
 
 
 /***/ }),
 
-/***/ "./node_modules/core-js/internals/forced-string-trim-method.js":
-/*!*********************************************************************!*\
-  !*** ./node_modules/core-js/internals/forced-string-trim-method.js ***!
-  \*********************************************************************/
+/***/ "./node_modules/core-js/internals/function-bind-context.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/core-js/internals/function-bind-context.js ***!
+  \*****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
-var whitespaces = __webpack_require__(/*! ../internals/whitespaces */ "./node_modules/core-js/internals/whitespaces.js");
+var aFunction = __webpack_require__(/*! ../internals/a-function */ "./node_modules/core-js/internals/a-function.js");
 
-var non = '\u200B\u0085\u180E';
-
-// check that a method works with the correct list
-// of whitespaces and has a correct name
-module.exports = function (METHOD_NAME) {
-  return fails(function () {
-    return !!whitespaces[METHOD_NAME]() || non[METHOD_NAME]() != non || whitespaces[METHOD_NAME].name !== METHOD_NAME;
-  });
+// optional / simple context binding
+module.exports = function (fn, that, length) {
+  aFunction(fn);
+  if (that === undefined) return fn;
+  switch (length) {
+    case 0: return function () {
+      return fn.call(that);
+    };
+    case 1: return function (a) {
+      return fn.call(that, a);
+    };
+    case 2: return function (a, b) {
+      return fn.call(that, a, b);
+    };
+    case 3: return function (a, b, c) {
+      return fn.call(that, a, b, c);
+    };
+  }
+  return function (/* ...args */) {
+    return fn.apply(that, arguments);
+  };
 };
 
 
@@ -1296,20 +1447,6 @@ module.exports = Function.bind || function bind(that /* , ...args */) {
   if (isObject(fn.prototype)) boundFunction.prototype = fn.prototype;
   return boundFunction;
 };
-
-
-/***/ }),
-
-/***/ "./node_modules/core-js/internals/function-to-string.js":
-/*!**************************************************************!*\
-  !*** ./node_modules/core-js/internals/function-to-string.js ***!
-  \**************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var shared = __webpack_require__(/*! ../internals/shared */ "./node_modules/core-js/internals/shared.js");
-
-module.exports = shared('native-function-to-string', Function.toString);
 
 
 /***/ }),
@@ -1365,7 +1502,6 @@ module.exports = function (it) {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-var O = 'object';
 var check = function (it) {
   return it && it.Math == Math && it;
 };
@@ -1373,10 +1509,10 @@ var check = function (it) {
 // https://github.com/zloirock/core-js/issues/86#issuecomment-115759028
 module.exports =
   // eslint-disable-next-line no-undef
-  check(typeof globalThis == O && globalThis) ||
-  check(typeof window == O && window) ||
-  check(typeof self == O && self) ||
-  check(typeof global == O && global) ||
+  check(typeof globalThis == 'object' && globalThis) ||
+  check(typeof window == 'object' && window) ||
+  check(typeof self == 'object' && self) ||
+  check(typeof global == 'object' && global) ||
   // eslint-disable-next-line no-new-func
   Function('return this')();
 
@@ -1407,27 +1543,6 @@ module.exports = function (it, key) {
 /***/ (function(module, exports) {
 
 module.exports = {};
-
-
-/***/ }),
-
-/***/ "./node_modules/core-js/internals/hide.js":
-/*!************************************************!*\
-  !*** ./node_modules/core-js/internals/hide.js ***!
-  \************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
-var definePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
-var createPropertyDescriptor = __webpack_require__(/*! ../internals/create-property-descriptor */ "./node_modules/core-js/internals/create-property-descriptor.js");
-
-module.exports = DESCRIPTORS ? function (object, key, value) {
-  return definePropertyModule.f(object, key, createPropertyDescriptor(1, value));
-} : function (object, key, value) {
-  object[key] = value;
-  return object;
-};
 
 
 /***/ }),
@@ -1519,6 +1634,29 @@ module.exports = function ($this, dummy, Wrapper) {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/inspect-source.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/core-js/internals/inspect-source.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var store = __webpack_require__(/*! ../internals/shared-store */ "./node_modules/core-js/internals/shared-store.js");
+
+var functionToString = Function.toString;
+
+// this helper broken in `3.4.1-3.4.4`, so we can't use `shared` helper
+if (typeof store.inspectSource != 'function') {
+  store.inspectSource = function (it) {
+    return functionToString.call(it);
+  };
+}
+
+module.exports = store.inspectSource;
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/internal-state.js":
 /*!**********************************************************!*\
   !*** ./node_modules/core-js/internals/internal-state.js ***!
@@ -1529,7 +1667,7 @@ module.exports = function ($this, dummy, Wrapper) {
 var NATIVE_WEAK_MAP = __webpack_require__(/*! ../internals/native-weak-map */ "./node_modules/core-js/internals/native-weak-map.js");
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
 var isObject = __webpack_require__(/*! ../internals/is-object */ "./node_modules/core-js/internals/is-object.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var objectHas = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
 var sharedKey = __webpack_require__(/*! ../internals/shared-key */ "./node_modules/core-js/internals/shared-key.js");
 var hiddenKeys = __webpack_require__(/*! ../internals/hidden-keys */ "./node_modules/core-js/internals/hidden-keys.js");
@@ -1569,7 +1707,7 @@ if (NATIVE_WEAK_MAP) {
   var STATE = sharedKey('state');
   hiddenKeys[STATE] = true;
   set = function (it, metadata) {
-    hide(it, STATE, metadata);
+    createNonEnumerableProperty(it, STATE, metadata);
     return metadata;
   };
   get = function (it) {
@@ -1721,7 +1859,7 @@ module.exports = function (it) {
 "use strict";
 
 var getPrototypeOf = __webpack_require__(/*! ../internals/object-get-prototype-of */ "./node_modules/core-js/internals/object-get-prototype-of.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 var IS_PURE = __webpack_require__(/*! ../internals/is-pure */ "./node_modules/core-js/internals/is-pure.js");
@@ -1748,7 +1886,9 @@ if ([].keys) {
 if (IteratorPrototype == undefined) IteratorPrototype = {};
 
 // 25.1.2.1.1 %IteratorPrototype%[@@iterator]()
-if (!IS_PURE && !has(IteratorPrototype, ITERATOR)) hide(IteratorPrototype, ITERATOR, returnThis);
+if (!IS_PURE && !has(IteratorPrototype, ITERATOR)) {
+  createNonEnumerableProperty(IteratorPrototype, ITERATOR, returnThis);
+}
 
 module.exports = {
   IteratorPrototype: IteratorPrototype,
@@ -1796,11 +1936,11 @@ module.exports = !!Object.getOwnPropertySymbols && !fails(function () {
 /***/ (function(module, exports, __webpack_require__) {
 
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
-var nativeFunctionToString = __webpack_require__(/*! ../internals/function-to-string */ "./node_modules/core-js/internals/function-to-string.js");
+var inspectSource = __webpack_require__(/*! ../internals/inspect-source */ "./node_modules/core-js/internals/inspect-source.js");
 
 var WeakMap = global.WeakMap;
 
-module.exports = typeof WeakMap === 'function' && /native code/.test(nativeFunctionToString.call(WeakMap));
+module.exports = typeof WeakMap === 'function' && /native code/.test(inspectSource(WeakMap));
 
 
 /***/ }),
@@ -1841,11 +1981,22 @@ var toObject = __webpack_require__(/*! ../internals/to-object */ "./node_modules
 var IndexedObject = __webpack_require__(/*! ../internals/indexed-object */ "./node_modules/core-js/internals/indexed-object.js");
 
 var nativeAssign = Object.assign;
+var defineProperty = Object.defineProperty;
 
 // `Object.assign` method
 // https://tc39.github.io/ecma262/#sec-object.assign
-// should work with symbols and should have deterministic property order (V8 bug)
 module.exports = !nativeAssign || fails(function () {
+  // should have correct order of operations (Edge bug)
+  if (DESCRIPTORS && nativeAssign({ b: 1 }, nativeAssign(defineProperty({}, 'a', {
+    enumerable: true,
+    get: function () {
+      defineProperty(this, 'b', {
+        value: 3,
+        enumerable: false
+      });
+    }
+  }), { b: 2 })).b !== 1) return true;
+  // should work with symbols and should have deterministic property order (V8 bug)
   var A = {};
   var B = {};
   // eslint-disable-next-line no-undef
@@ -1890,48 +2041,77 @@ var hiddenKeys = __webpack_require__(/*! ../internals/hidden-keys */ "./node_mod
 var html = __webpack_require__(/*! ../internals/html */ "./node_modules/core-js/internals/html.js");
 var documentCreateElement = __webpack_require__(/*! ../internals/document-create-element */ "./node_modules/core-js/internals/document-create-element.js");
 var sharedKey = __webpack_require__(/*! ../internals/shared-key */ "./node_modules/core-js/internals/shared-key.js");
+
+var GT = '>';
+var LT = '<';
+var PROTOTYPE = 'prototype';
+var SCRIPT = 'script';
 var IE_PROTO = sharedKey('IE_PROTO');
 
-var PROTOTYPE = 'prototype';
-var Empty = function () { /* empty */ };
+var EmptyConstructor = function () { /* empty */ };
+
+var scriptTag = function (content) {
+  return LT + SCRIPT + GT + content + LT + '/' + SCRIPT + GT;
+};
+
+// Create object with fake `null` prototype: use ActiveX Object with cleared prototype
+var NullProtoObjectViaActiveX = function (activeXDocument) {
+  activeXDocument.write(scriptTag(''));
+  activeXDocument.close();
+  var temp = activeXDocument.parentWindow.Object;
+  activeXDocument = null; // avoid memory leak
+  return temp;
+};
 
 // Create object with fake `null` prototype: use iframe Object with cleared prototype
-var createDict = function () {
+var NullProtoObjectViaIFrame = function () {
   // Thrash, waste and sodomy: IE GC bug
   var iframe = documentCreateElement('iframe');
-  var length = enumBugKeys.length;
-  var lt = '<';
-  var script = 'script';
-  var gt = '>';
-  var js = 'java' + script + ':';
+  var JS = 'java' + SCRIPT + ':';
   var iframeDocument;
   iframe.style.display = 'none';
   html.appendChild(iframe);
-  iframe.src = String(js);
+  // https://github.com/zloirock/core-js/issues/475
+  iframe.src = String(JS);
   iframeDocument = iframe.contentWindow.document;
   iframeDocument.open();
-  iframeDocument.write(lt + script + gt + 'document.F=Object' + lt + '/' + script + gt);
+  iframeDocument.write(scriptTag('document.F=Object'));
   iframeDocument.close();
-  createDict = iframeDocument.F;
-  while (length--) delete createDict[PROTOTYPE][enumBugKeys[length]];
-  return createDict();
+  return iframeDocument.F;
 };
+
+// Check for document.domain and active x support
+// No need to use active x approach when document.domain is not set
+// see https://github.com/es-shims/es5-shim/issues/150
+// variation of https://github.com/kitcambridge/es5-shim/commit/4f738ac066346
+// avoid IE GC bug
+var activeXDocument;
+var NullProtoObject = function () {
+  try {
+    /* global ActiveXObject */
+    activeXDocument = document.domain && new ActiveXObject('htmlfile');
+  } catch (error) { /* ignore */ }
+  NullProtoObject = activeXDocument ? NullProtoObjectViaActiveX(activeXDocument) : NullProtoObjectViaIFrame();
+  var length = enumBugKeys.length;
+  while (length--) delete NullProtoObject[PROTOTYPE][enumBugKeys[length]];
+  return NullProtoObject();
+};
+
+hiddenKeys[IE_PROTO] = true;
 
 // `Object.create` method
 // https://tc39.github.io/ecma262/#sec-object.create
 module.exports = Object.create || function create(O, Properties) {
   var result;
   if (O !== null) {
-    Empty[PROTOTYPE] = anObject(O);
-    result = new Empty();
-    Empty[PROTOTYPE] = null;
+    EmptyConstructor[PROTOTYPE] = anObject(O);
+    result = new EmptyConstructor();
+    EmptyConstructor[PROTOTYPE] = null;
     // add "__proto__" for Object.getPrototypeOf polyfill
     result[IE_PROTO] = O;
-  } else result = createDict();
+  } else result = NullProtoObject();
   return Properties === undefined ? result : defineProperties(result, Properties);
 };
-
-hiddenKeys[IE_PROTO] = true;
 
 
 /***/ }),
@@ -2226,6 +2406,49 @@ module.exports = Object.setPrototypeOf || ('__proto__' in {} ? function () {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/object-to-array.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/core-js/internals/object-to-array.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
+var objectKeys = __webpack_require__(/*! ../internals/object-keys */ "./node_modules/core-js/internals/object-keys.js");
+var toIndexedObject = __webpack_require__(/*! ../internals/to-indexed-object */ "./node_modules/core-js/internals/to-indexed-object.js");
+var propertyIsEnumerable = __webpack_require__(/*! ../internals/object-property-is-enumerable */ "./node_modules/core-js/internals/object-property-is-enumerable.js").f;
+
+// `Object.{ entries, values }` methods implementation
+var createMethod = function (TO_ENTRIES) {
+  return function (it) {
+    var O = toIndexedObject(it);
+    var keys = objectKeys(O);
+    var length = keys.length;
+    var i = 0;
+    var result = [];
+    var key;
+    while (length > i) {
+      key = keys[i++];
+      if (!DESCRIPTORS || propertyIsEnumerable.call(O, key)) {
+        result.push(TO_ENTRIES ? [key, O[key]] : O[key]);
+      }
+    }
+    return result;
+  };
+};
+
+module.exports = {
+  // `Object.entries` method
+  // https://tc39.github.io/ecma262/#sec-object.entries
+  entries: createMethod(true),
+  // `Object.values` method
+  // https://tc39.github.io/ecma262/#sec-object.values
+  values: createMethod(false)
+};
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/object-to-string.js":
 /*!************************************************************!*\
   !*** ./node_modules/core-js/internals/object-to-string.js ***!
@@ -2235,19 +2458,14 @@ module.exports = Object.setPrototypeOf || ('__proto__' in {} ? function () {
 
 "use strict";
 
+var TO_STRING_TAG_SUPPORT = __webpack_require__(/*! ../internals/to-string-tag-support */ "./node_modules/core-js/internals/to-string-tag-support.js");
 var classof = __webpack_require__(/*! ../internals/classof */ "./node_modules/core-js/internals/classof.js");
-var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
-
-var TO_STRING_TAG = wellKnownSymbol('toStringTag');
-var test = {};
-
-test[TO_STRING_TAG] = 'z';
 
 // `Object.prototype.toString` method implementation
 // https://tc39.github.io/ecma262/#sec-object.prototype.tostring
-module.exports = String(test) !== '[object z]' ? function toString() {
+module.exports = TO_STRING_TAG_SUPPORT ? {}.toString : function toString() {
   return '[object ' + classof(this) + ']';
-} : test.toString;
+};
 
 
 /***/ }),
@@ -2281,7 +2499,9 @@ module.exports = getBuiltIn('Reflect', 'ownKeys') || function ownKeys(it) {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+
+module.exports = global;
 
 
 /***/ }),
@@ -2311,27 +2531,22 @@ module.exports = function (target, src, options) {
 /***/ (function(module, exports, __webpack_require__) {
 
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
-var shared = __webpack_require__(/*! ../internals/shared */ "./node_modules/core-js/internals/shared.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
 var setGlobal = __webpack_require__(/*! ../internals/set-global */ "./node_modules/core-js/internals/set-global.js");
-var nativeFunctionToString = __webpack_require__(/*! ../internals/function-to-string */ "./node_modules/core-js/internals/function-to-string.js");
+var inspectSource = __webpack_require__(/*! ../internals/inspect-source */ "./node_modules/core-js/internals/inspect-source.js");
 var InternalStateModule = __webpack_require__(/*! ../internals/internal-state */ "./node_modules/core-js/internals/internal-state.js");
 
 var getInternalState = InternalStateModule.get;
 var enforceInternalState = InternalStateModule.enforce;
-var TEMPLATE = String(nativeFunctionToString).split('toString');
-
-shared('inspectSource', function (it) {
-  return nativeFunctionToString.call(it);
-});
+var TEMPLATE = String(String).split('String');
 
 (module.exports = function (O, key, value, options) {
   var unsafe = options ? !!options.unsafe : false;
   var simple = options ? !!options.enumerable : false;
   var noTargetGet = options ? !!options.noTargetGet : false;
   if (typeof value == 'function') {
-    if (typeof key == 'string' && !has(value, 'name')) hide(value, 'name', key);
+    if (typeof key == 'string' && !has(value, 'name')) createNonEnumerableProperty(value, 'name', key);
     enforceInternalState(value).source = TEMPLATE.join(typeof key == 'string' ? key : '');
   }
   if (O === global) {
@@ -2344,10 +2559,10 @@ shared('inspectSource', function (it) {
     simple = true;
   }
   if (simple) O[key] = value;
-  else hide(O, key, value);
+  else createNonEnumerableProperty(O, key, value);
 // add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
 })(Function.prototype, 'toString', function toString() {
-  return typeof this == 'function' && getInternalState(this).source || nativeFunctionToString.call(this);
+  return typeof this == 'function' && getInternalState(this).source || inspectSource(this);
 });
 
 
@@ -2396,6 +2611,7 @@ module.exports = function (R, S) {
 "use strict";
 
 var regexpFlags = __webpack_require__(/*! ./regexp-flags */ "./node_modules/core-js/internals/regexp-flags.js");
+var stickyHelpers = __webpack_require__(/*! ./regexp-sticky-helpers */ "./node_modules/core-js/internals/regexp-sticky-helpers.js");
 
 var nativeExec = RegExp.prototype.exec;
 // This always refers to the native implementation, because the
@@ -2413,24 +2629,56 @@ var UPDATES_LAST_INDEX_WRONG = (function () {
   return re1.lastIndex !== 0 || re2.lastIndex !== 0;
 })();
 
+var UNSUPPORTED_Y = stickyHelpers.UNSUPPORTED_Y || stickyHelpers.BROKEN_CARET;
+
 // nonparticipating capturing group, copied from es5-shim's String#split patch.
 var NPCG_INCLUDED = /()??/.exec('')[1] !== undefined;
 
-var PATCH = UPDATES_LAST_INDEX_WRONG || NPCG_INCLUDED;
+var PATCH = UPDATES_LAST_INDEX_WRONG || NPCG_INCLUDED || UNSUPPORTED_Y;
 
 if (PATCH) {
   patchedExec = function exec(str) {
     var re = this;
     var lastIndex, reCopy, match, i;
+    var sticky = UNSUPPORTED_Y && re.sticky;
+    var flags = regexpFlags.call(re);
+    var source = re.source;
+    var charsAdded = 0;
+    var strCopy = str;
+
+    if (sticky) {
+      flags = flags.replace('y', '');
+      if (flags.indexOf('g') === -1) {
+        flags += 'g';
+      }
+
+      strCopy = String(str).slice(re.lastIndex);
+      // Support anchored sticky behavior.
+      if (re.lastIndex > 0 && (!re.multiline || re.multiline && str[re.lastIndex - 1] !== '\n')) {
+        source = '(?: ' + source + ')';
+        strCopy = ' ' + strCopy;
+        charsAdded++;
+      }
+      // ^(? + rx + ) is needed, in combination with some str slicing, to
+      // simulate the 'y' flag.
+      reCopy = new RegExp('^(?:' + source + ')', flags);
+    }
 
     if (NPCG_INCLUDED) {
-      reCopy = new RegExp('^' + re.source + '$(?!\\s)', regexpFlags.call(re));
+      reCopy = new RegExp('^' + source + '$(?!\\s)', flags);
     }
     if (UPDATES_LAST_INDEX_WRONG) lastIndex = re.lastIndex;
 
-    match = nativeExec.call(re, str);
+    match = nativeExec.call(sticky ? reCopy : re, strCopy);
 
-    if (UPDATES_LAST_INDEX_WRONG && match) {
+    if (sticky) {
+      if (match) {
+        match.input = match.input.slice(charsAdded);
+        match[0] = match[0].slice(charsAdded);
+        match.index = re.lastIndex;
+        re.lastIndex += match[0].length;
+      } else re.lastIndex = 0;
+    } else if (UPDATES_LAST_INDEX_WRONG && match) {
       re.lastIndex = re.global ? match.index + match[0].length : lastIndex;
     }
     if (NPCG_INCLUDED && match && match.length > 1) {
@@ -2480,6 +2728,41 @@ module.exports = function () {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/regexp-sticky-helpers.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/core-js/internals/regexp-sticky-helpers.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var fails = __webpack_require__(/*! ./fails */ "./node_modules/core-js/internals/fails.js");
+
+// babel-minify transpiles RegExp('a', 'y') -> /a/y and it causes SyntaxError,
+// so we use an intermediate function.
+function RE(s, f) {
+  return RegExp(s, f);
+}
+
+exports.UNSUPPORTED_Y = fails(function () {
+  // babel-minify transpiles RegExp('a', 'y') -> /a/y and it causes SyntaxError
+  var re = RE('a', 'y');
+  re.lastIndex = 2;
+  return re.exec('abcd') != null;
+});
+
+exports.BROKEN_CARET = fails(function () {
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=773687
+  var re = RE('^r', 'gy');
+  re.lastIndex = 2;
+  return re.exec('str') != null;
+});
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/require-object-coercible.js":
 /*!********************************************************************!*\
   !*** ./node_modules/core-js/internals/require-object-coercible.js ***!
@@ -2522,11 +2805,11 @@ module.exports = Object.is || function is(x, y) {
 /***/ (function(module, exports, __webpack_require__) {
 
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 
 module.exports = function (key, value) {
   try {
-    hide(global, key, value);
+    createNonEnumerableProperty(global, key, value);
   } catch (error) {
     global[key] = value;
   } return value;
@@ -2607,6 +2890,24 @@ module.exports = function (key) {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/shared-store.js":
+/*!********************************************************!*\
+  !*** ./node_modules/core-js/internals/shared-store.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+var setGlobal = __webpack_require__(/*! ../internals/set-global */ "./node_modules/core-js/internals/set-global.js");
+
+var SHARED = '__core-js_shared__';
+var store = global[SHARED] || setGlobal(SHARED, {});
+
+module.exports = store;
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/shared.js":
 /*!**************************************************!*\
   !*** ./node_modules/core-js/internals/shared.js ***!
@@ -2614,42 +2915,16 @@ module.exports = function (key) {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
-var setGlobal = __webpack_require__(/*! ../internals/set-global */ "./node_modules/core-js/internals/set-global.js");
 var IS_PURE = __webpack_require__(/*! ../internals/is-pure */ "./node_modules/core-js/internals/is-pure.js");
-
-var SHARED = '__core-js_shared__';
-var store = global[SHARED] || setGlobal(SHARED, {});
+var store = __webpack_require__(/*! ../internals/shared-store */ "./node_modules/core-js/internals/shared-store.js");
 
 (module.exports = function (key, value) {
   return store[key] || (store[key] = value !== undefined ? value : {});
 })('versions', []).push({
-  version: '3.1.3',
+  version: '3.6.4',
   mode: IS_PURE ? 'pure' : 'global',
-  copyright: '© 2019 Denis Pushkarev (zloirock.ru)'
+  copyright: '© 2020 Denis Pushkarev (zloirock.ru)'
 });
-
-
-/***/ }),
-
-/***/ "./node_modules/core-js/internals/sloppy-array-method.js":
-/*!***************************************************************!*\
-  !*** ./node_modules/core-js/internals/sloppy-array-method.js ***!
-  \***************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
-
-module.exports = function (METHOD_NAME, argument) {
-  var method = [][METHOD_NAME];
-  return !method || !fails(function () {
-    // eslint-disable-next-line no-useless-call,no-throw-literal
-    method.call(null, argument || function () { throw 1; }, 1);
-  });
-};
 
 
 /***/ }),
@@ -2712,6 +2987,22 @@ module.exports = {
   // https://github.com/mathiasbynens/String.prototype.at
   charAt: createMethod(true)
 };
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/internals/string-pad-webkit-bug.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/core-js/internals/string-pad-webkit-bug.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// https://github.com/zloirock/core-js/issues/280
+var userAgent = __webpack_require__(/*! ../internals/engine-user-agent */ "./node_modules/core-js/internals/engine-user-agent.js");
+
+// eslint-disable-next-line unicorn/no-unsafe-regex
+module.exports = /Version\/10\.\d+(\.\d+)?( Mobile\/\w+)? Safari\//.test(userAgent);
 
 
 /***/ }),
@@ -2779,6 +3070,29 @@ module.exports = ''.repeat || function repeat(count) {
   if (n < 0 || n == Infinity) throw RangeError('Wrong number of repetitions');
   for (;n > 0; (n >>>= 1) && (str += str)) if (n & 1) result += str;
   return result;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/internals/string-trim-forced.js":
+/*!**************************************************************!*\
+  !*** ./node_modules/core-js/internals/string-trim-forced.js ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+var whitespaces = __webpack_require__(/*! ../internals/whitespaces */ "./node_modules/core-js/internals/whitespaces.js");
+
+var non = '\u200B\u0085\u180E';
+
+// check that a method works with the correct list
+// of whitespaces and has a correct name
+module.exports = function (METHOD_NAME) {
+  return fails(function () {
+    return !!whitespaces[METHOD_NAME]() || non[METHOD_NAME]() != non || whitespaces[METHOD_NAME].name !== METHOD_NAME;
+  });
 };
 
 
@@ -2858,7 +3172,7 @@ var min = Math.min;
 
 // Helper for a popular repeating case of the spec:
 // Let integer be ? ToInteger(index).
-// If integer < 0, let result be max((length + integer), 0); else let result be min(length, length).
+// If integer < 0, let result be max((length + integer), 0); else let result be min(integer, length).
 module.exports = function (index, length) {
   var integer = toInteger(index);
   return integer < 0 ? max(integer + length, 0) : min(integer, length);
@@ -2967,6 +3281,25 @@ module.exports = function (input, PREFERRED_STRING) {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/internals/to-string-tag-support.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/core-js/internals/to-string-tag-support.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
+
+var TO_STRING_TAG = wellKnownSymbol('toStringTag');
+var test = {};
+
+test[TO_STRING_TAG] = 'z';
+
+module.exports = String(test) === '[object z]';
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/internals/uid.js":
 /*!***********************************************!*\
   !*** ./node_modules/core-js/internals/uid.js ***!
@@ -2984,32 +3317,34 @@ module.exports = function (key) {
 
 /***/ }),
 
-/***/ "./node_modules/core-js/internals/user-agent.js":
-/*!******************************************************!*\
-  !*** ./node_modules/core-js/internals/user-agent.js ***!
-  \******************************************************/
+/***/ "./node_modules/core-js/internals/use-symbol-as-uid.js":
+/*!*************************************************************!*\
+  !*** ./node_modules/core-js/internals/use-symbol-as-uid.js ***!
+  \*************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-var getBuiltIn = __webpack_require__(/*! ../internals/get-built-in */ "./node_modules/core-js/internals/get-built-in.js");
+var NATIVE_SYMBOL = __webpack_require__(/*! ../internals/native-symbol */ "./node_modules/core-js/internals/native-symbol.js");
 
-module.exports = getBuiltIn('navigator', 'userAgent') || '';
+module.exports = NATIVE_SYMBOL
+  // eslint-disable-next-line no-undef
+  && !Symbol.sham
+  // eslint-disable-next-line no-undef
+  && typeof Symbol.iterator == 'symbol';
 
 
 /***/ }),
 
-/***/ "./node_modules/core-js/internals/webkit-string-pad-bug.js":
-/*!*****************************************************************!*\
-  !*** ./node_modules/core-js/internals/webkit-string-pad-bug.js ***!
-  \*****************************************************************/
+/***/ "./node_modules/core-js/internals/well-known-symbol-wrapped.js":
+/*!*********************************************************************!*\
+  !*** ./node_modules/core-js/internals/well-known-symbol-wrapped.js ***!
+  \*********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-// https://github.com/zloirock/core-js/issues/280
-var userAgent = __webpack_require__(/*! ../internals/user-agent */ "./node_modules/core-js/internals/user-agent.js");
+var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 
-// eslint-disable-next-line unicorn/no-unsafe-regex
-module.exports = /Version\/10\.\d+(\.\d+)?( Mobile\/\w+)? Safari\//.test(userAgent);
+exports.f = wellKnownSymbol;
 
 
 /***/ }),
@@ -3023,15 +3358,20 @@ module.exports = /Version\/10\.\d+(\.\d+)?( Mobile\/\w+)? Safari\//.test(userAge
 
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
 var shared = __webpack_require__(/*! ../internals/shared */ "./node_modules/core-js/internals/shared.js");
+var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
 var uid = __webpack_require__(/*! ../internals/uid */ "./node_modules/core-js/internals/uid.js");
 var NATIVE_SYMBOL = __webpack_require__(/*! ../internals/native-symbol */ "./node_modules/core-js/internals/native-symbol.js");
+var USE_SYMBOL_AS_UID = __webpack_require__(/*! ../internals/use-symbol-as-uid */ "./node_modules/core-js/internals/use-symbol-as-uid.js");
 
+var WellKnownSymbolsStore = shared('wks');
 var Symbol = global.Symbol;
-var store = shared('wks');
+var createWellKnownSymbol = USE_SYMBOL_AS_UID ? Symbol : Symbol && Symbol.withoutSetter || uid;
 
 module.exports = function (name) {
-  return store[name] || (store[name] = NATIVE_SYMBOL && Symbol[name]
-    || (NATIVE_SYMBOL ? Symbol : uid)('Symbol.' + name));
+  if (!has(WellKnownSymbolsStore, name)) {
+    if (NATIVE_SYMBOL && has(Symbol, name)) WellKnownSymbolsStore[name] = Symbol[name];
+    else WellKnownSymbolsStore[name] = createWellKnownSymbol('Symbol.' + name);
+  } return WellKnownSymbolsStore[name];
 };
 
 
@@ -3047,18 +3387,6 @@ module.exports = function (name) {
 // a string of all valid unicode whitespaces
 // eslint-disable-next-line max-len
 module.exports = '\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028\u2029\uFEFF';
-
-
-/***/ }),
-
-/***/ "./node_modules/core-js/internals/wrapped-well-known-symbol.js":
-/*!*********************************************************************!*\
-  !*** ./node_modules/core-js/internals/wrapped-well-known-symbol.js ***!
-  \*********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports.f = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 
 
 /***/ }),
@@ -3082,12 +3410,16 @@ var createProperty = __webpack_require__(/*! ../internals/create-property */ "./
 var arraySpeciesCreate = __webpack_require__(/*! ../internals/array-species-create */ "./node_modules/core-js/internals/array-species-create.js");
 var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
+var V8_VERSION = __webpack_require__(/*! ../internals/engine-v8-version */ "./node_modules/core-js/internals/engine-v8-version.js");
 
 var IS_CONCAT_SPREADABLE = wellKnownSymbol('isConcatSpreadable');
 var MAX_SAFE_INTEGER = 0x1FFFFFFFFFFFFF;
 var MAXIMUM_ALLOWED_INDEX_EXCEEDED = 'Maximum allowed index exceeded';
 
-var IS_CONCAT_SPREADABLE_SUPPORT = !fails(function () {
+// We can't use this feature detection in V8 since it causes
+// deoptimization and serious performance degradation
+// https://github.com/zloirock/core-js/issues/679
+var IS_CONCAT_SPREADABLE_SUPPORT = V8_VERSION >= 51 || !fails(function () {
   var array = [];
   array[IS_CONCAT_SPREADABLE] = false;
   return array.concat()[0] !== array;
@@ -3143,11 +3475,16 @@ $({ target: 'Array', proto: true, forced: FORCED }, {
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $filter = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").filter;
 var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var HAS_SPECIES_SUPPORT = arrayMethodHasSpeciesSupport('filter');
+// Edge 14- issue
+var USES_TO_LENGTH = arrayMethodUsesToLength('filter');
 
 // `Array.prototype.filter` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.filter
 // with adding support of @@species
-$({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('filter') }, {
+$({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT || !USES_TO_LENGTH }, {
   filter: function filter(callbackfn /* , thisArg */) {
     return $filter(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
   }
@@ -3168,16 +3505,19 @@ $({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('filter'
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $findIndex = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").findIndex;
 var addToUnscopables = __webpack_require__(/*! ../internals/add-to-unscopables */ "./node_modules/core-js/internals/add-to-unscopables.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
 
 var FIND_INDEX = 'findIndex';
 var SKIPS_HOLES = true;
+
+var USES_TO_LENGTH = arrayMethodUsesToLength(FIND_INDEX);
 
 // Shouldn't skip holes
 if (FIND_INDEX in []) Array(1)[FIND_INDEX](function () { SKIPS_HOLES = false; });
 
 // `Array.prototype.findIndex` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.findindex
-$({ target: 'Array', proto: true, forced: SKIPS_HOLES }, {
+$({ target: 'Array', proto: true, forced: SKIPS_HOLES || !USES_TO_LENGTH }, {
   findIndex: function findIndex(callbackfn /* , that = undefined */) {
     return $findIndex(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
   }
@@ -3201,16 +3541,19 @@ addToUnscopables(FIND_INDEX);
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $find = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").find;
 var addToUnscopables = __webpack_require__(/*! ../internals/add-to-unscopables */ "./node_modules/core-js/internals/add-to-unscopables.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
 
 var FIND = 'find';
 var SKIPS_HOLES = true;
+
+var USES_TO_LENGTH = arrayMethodUsesToLength(FIND);
 
 // Shouldn't skip holes
 if (FIND in []) Array(1)[FIND](function () { SKIPS_HOLES = false; });
 
 // `Array.prototype.find` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.find
-$({ target: 'Array', proto: true, forced: SKIPS_HOLES }, {
+$({ target: 'Array', proto: true, forced: SKIPS_HOLES || !USES_TO_LENGTH }, {
   find: function find(callbackfn /* , that = undefined */) {
     return $find(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
   }
@@ -3218,6 +3561,27 @@ $({ target: 'Array', proto: true, forced: SKIPS_HOLES }, {
 
 // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
 addToUnscopables(FIND);
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.array.for-each.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.array.for-each.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var forEach = __webpack_require__(/*! ../internals/array-for-each */ "./node_modules/core-js/internals/array-for-each.js");
+
+// `Array.prototype.forEach` method
+// https://tc39.github.io/ecma262/#sec-array.prototype.foreach
+$({ target: 'Array', proto: true, forced: [].forEach != forEach }, {
+  forEach: forEach
+});
 
 
 /***/ }),
@@ -3258,10 +3622,13 @@ $({ target: 'Array', stat: true, forced: INCORRECT_ITERATION }, {
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $includes = __webpack_require__(/*! ../internals/array-includes */ "./node_modules/core-js/internals/array-includes.js").includes;
 var addToUnscopables = __webpack_require__(/*! ../internals/add-to-unscopables */ "./node_modules/core-js/internals/add-to-unscopables.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var USES_TO_LENGTH = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
 
 // `Array.prototype.includes` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.includes
-$({ target: 'Array', proto: true }, {
+$({ target: 'Array', proto: true, forced: !USES_TO_LENGTH }, {
   includes: function includes(el /* , fromIndex = 0 */) {
     return $includes(this, el, arguments.length > 1 ? arguments[1] : undefined);
   }
@@ -3269,6 +3636,40 @@ $({ target: 'Array', proto: true }, {
 
 // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
 addToUnscopables('includes');
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.array.index-of.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.array.index-of.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var $indexOf = __webpack_require__(/*! ../internals/array-includes */ "./node_modules/core-js/internals/array-includes.js").indexOf;
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var nativeIndexOf = [].indexOf;
+
+var NEGATIVE_ZERO = !!nativeIndexOf && 1 / [1].indexOf(1, -0) < 0;
+var STRICT_METHOD = arrayMethodIsStrict('indexOf');
+var USES_TO_LENGTH = arrayMethodUsesToLength('indexOf', { ACCESSORS: true, 1: 0 });
+
+// `Array.prototype.indexOf` method
+// https://tc39.github.io/ecma262/#sec-array.prototype.indexof
+$({ target: 'Array', proto: true, forced: NEGATIVE_ZERO || !STRICT_METHOD || !USES_TO_LENGTH }, {
+  indexOf: function indexOf(searchElement /* , fromIndex = 0 */) {
+    return NEGATIVE_ZERO
+      // convert -0 to +0
+      ? nativeIndexOf.apply(this, arguments) || 0
+      : $indexOf(this, searchElement, arguments.length > 1 ? arguments[1] : undefined);
+  }
+});
 
 
 /***/ }),
@@ -3350,16 +3751,16 @@ addToUnscopables('entries');
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var IndexedObject = __webpack_require__(/*! ../internals/indexed-object */ "./node_modules/core-js/internals/indexed-object.js");
 var toIndexedObject = __webpack_require__(/*! ../internals/to-indexed-object */ "./node_modules/core-js/internals/to-indexed-object.js");
-var sloppyArrayMethod = __webpack_require__(/*! ../internals/sloppy-array-method */ "./node_modules/core-js/internals/sloppy-array-method.js");
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
 
 var nativeJoin = [].join;
 
 var ES3_STRINGS = IndexedObject != Object;
-var SLOPPY_METHOD = sloppyArrayMethod('join', ',');
+var STRICT_METHOD = arrayMethodIsStrict('join', ',');
 
 // `Array.prototype.join` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.join
-$({ target: 'Array', proto: true, forced: ES3_STRINGS || SLOPPY_METHOD }, {
+$({ target: 'Array', proto: true, forced: ES3_STRINGS || !STRICT_METHOD }, {
   join: function join(separator) {
     return nativeJoin.call(toIndexedObject(this), separator === undefined ? ',' : separator);
   }
@@ -3380,13 +3781,46 @@ $({ target: 'Array', proto: true, forced: ES3_STRINGS || SLOPPY_METHOD }, {
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $map = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").map;
 var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var HAS_SPECIES_SUPPORT = arrayMethodHasSpeciesSupport('map');
+// FF49- issue
+var USES_TO_LENGTH = arrayMethodUsesToLength('map');
 
 // `Array.prototype.map` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.map
 // with adding support of @@species
-$({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('map') }, {
+$({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT || !USES_TO_LENGTH }, {
   map: function map(callbackfn /* , thisArg */) {
     return $map(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.array.reduce.js":
+/*!*********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.array.reduce.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var $reduce = __webpack_require__(/*! ../internals/array-reduce */ "./node_modules/core-js/internals/array-reduce.js").left;
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var STRICT_METHOD = arrayMethodIsStrict('reduce');
+var USES_TO_LENGTH = arrayMethodUsesToLength('reduce', { 1: 0 });
+
+// `Array.prototype.reduce` method
+// https://tc39.github.io/ecma262/#sec-array.prototype.reduce
+$({ target: 'Array', proto: true, forced: !STRICT_METHOD || !USES_TO_LENGTH }, {
+  reduce: function reduce(callbackfn /* , initialValue */) {
+    return $reduce(this, callbackfn, arguments.length, arguments.length > 1 ? arguments[1] : undefined);
   }
 });
 
@@ -3409,8 +3843,12 @@ var toAbsoluteIndex = __webpack_require__(/*! ../internals/to-absolute-index */ 
 var toLength = __webpack_require__(/*! ../internals/to-length */ "./node_modules/core-js/internals/to-length.js");
 var toIndexedObject = __webpack_require__(/*! ../internals/to-indexed-object */ "./node_modules/core-js/internals/to-indexed-object.js");
 var createProperty = __webpack_require__(/*! ../internals/create-property */ "./node_modules/core-js/internals/create-property.js");
-var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
+var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var HAS_SPECIES_SUPPORT = arrayMethodHasSpeciesSupport('slice');
+var USES_TO_LENGTH = arrayMethodUsesToLength('slice', { ACCESSORS: true, 0: 0, 1: 2 });
 
 var SPECIES = wellKnownSymbol('species');
 var nativeSlice = [].slice;
@@ -3419,7 +3857,7 @@ var max = Math.max;
 // `Array.prototype.slice` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.slice
 // fallback for not array-like ES3 strings and DOM objects
-$({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('slice') }, {
+$({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT || !USES_TO_LENGTH }, {
   slice: function slice(start, end) {
     var O = toIndexedObject(this);
     var length = toLength(O.length);
@@ -3450,6 +3888,34 @@ $({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('slice')
 
 /***/ }),
 
+/***/ "./node_modules/core-js/modules/es.array.some.js":
+/*!*******************************************************!*\
+  !*** ./node_modules/core-js/modules/es.array.some.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var $some = __webpack_require__(/*! ../internals/array-iteration */ "./node_modules/core-js/internals/array-iteration.js").some;
+var arrayMethodIsStrict = __webpack_require__(/*! ../internals/array-method-is-strict */ "./node_modules/core-js/internals/array-method-is-strict.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var STRICT_METHOD = arrayMethodIsStrict('some');
+var USES_TO_LENGTH = arrayMethodUsesToLength('some');
+
+// `Array.prototype.some` method
+// https://tc39.github.io/ecma262/#sec-array.prototype.some
+$({ target: 'Array', proto: true, forced: !STRICT_METHOD || !USES_TO_LENGTH }, {
+  some: function some(callbackfn /* , thisArg */) {
+    return $some(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
+  }
+});
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/modules/es.array.splice.js":
 /*!*********************************************************!*\
   !*** ./node_modules/core-js/modules/es.array.splice.js ***!
@@ -3467,6 +3933,10 @@ var toObject = __webpack_require__(/*! ../internals/to-object */ "./node_modules
 var arraySpeciesCreate = __webpack_require__(/*! ../internals/array-species-create */ "./node_modules/core-js/internals/array-species-create.js");
 var createProperty = __webpack_require__(/*! ../internals/create-property */ "./node_modules/core-js/internals/create-property.js");
 var arrayMethodHasSpeciesSupport = __webpack_require__(/*! ../internals/array-method-has-species-support */ "./node_modules/core-js/internals/array-method-has-species-support.js");
+var arrayMethodUsesToLength = __webpack_require__(/*! ../internals/array-method-uses-to-length */ "./node_modules/core-js/internals/array-method-uses-to-length.js");
+
+var HAS_SPECIES_SUPPORT = arrayMethodHasSpeciesSupport('splice');
+var USES_TO_LENGTH = arrayMethodUsesToLength('splice', { ACCESSORS: true, 0: 0, 1: 2 });
 
 var max = Math.max;
 var min = Math.min;
@@ -3476,7 +3946,7 @@ var MAXIMUM_ALLOWED_LENGTH_EXCEEDED = 'Maximum allowed length exceeded';
 // `Array.prototype.splice` method
 // https://tc39.github.io/ecma262/#sec-array.prototype.splice
 // with adding support of @@species
-$({ target: 'Array', proto: true, forced: !arrayMethodHasSpeciesSupport('splice') }, {
+$({ target: 'Array', proto: true, forced: !HAS_SPECIES_SUPPORT || !USES_TO_LENGTH }, {
   splice: function splice(start, deleteCount /* , ...items */) {
     var O = toObject(this);
     var len = toLength(O.length);
@@ -3856,6 +4326,41 @@ $({ target: 'Object', stat: true, forced: FORCED, sham: !DESCRIPTORS }, {
 
 /***/ }),
 
+/***/ "./node_modules/core-js/modules/es.object.get-own-property-descriptors.js":
+/*!********************************************************************************!*\
+  !*** ./node_modules/core-js/modules/es.object.get-own-property-descriptors.js ***!
+  \********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
+var ownKeys = __webpack_require__(/*! ../internals/own-keys */ "./node_modules/core-js/internals/own-keys.js");
+var toIndexedObject = __webpack_require__(/*! ../internals/to-indexed-object */ "./node_modules/core-js/internals/to-indexed-object.js");
+var getOwnPropertyDescriptorModule = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js");
+var createProperty = __webpack_require__(/*! ../internals/create-property */ "./node_modules/core-js/internals/create-property.js");
+
+// `Object.getOwnPropertyDescriptors` method
+// https://tc39.github.io/ecma262/#sec-object.getownpropertydescriptors
+$({ target: 'Object', stat: true, sham: !DESCRIPTORS }, {
+  getOwnPropertyDescriptors: function getOwnPropertyDescriptors(object) {
+    var O = toIndexedObject(object);
+    var getOwnPropertyDescriptor = getOwnPropertyDescriptorModule.f;
+    var keys = ownKeys(O);
+    var result = {};
+    var index = 0;
+    var key, descriptor;
+    while (keys.length > index) {
+      descriptor = getOwnPropertyDescriptor(O, key = keys[index++]);
+      if (descriptor !== undefined) createProperty(result, key, descriptor);
+    }
+    return result;
+  }
+});
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/modules/es.object.get-prototype-of.js":
 /*!********************************************************************!*\
   !*** ./node_modules/core-js/modules/es.object.get-prototype-of.js ***!
@@ -3915,16 +4420,189 @@ $({ target: 'Object', stat: true, forced: FAILS_ON_PRIMITIVES }, {
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
+var TO_STRING_TAG_SUPPORT = __webpack_require__(/*! ../internals/to-string-tag-support */ "./node_modules/core-js/internals/to-string-tag-support.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var toString = __webpack_require__(/*! ../internals/object-to-string */ "./node_modules/core-js/internals/object-to-string.js");
 
-var ObjectPrototype = Object.prototype;
-
 // `Object.prototype.toString` method
 // https://tc39.github.io/ecma262/#sec-object.prototype.tostring
-if (toString !== ObjectPrototype.toString) {
-  redefine(ObjectPrototype, 'toString', toString, { unsafe: true });
+if (!TO_STRING_TAG_SUPPORT) {
+  redefine(Object.prototype, 'toString', toString, { unsafe: true });
 }
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.object.values.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.object.values.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var $values = __webpack_require__(/*! ../internals/object-to-array */ "./node_modules/core-js/internals/object-to-array.js").values;
+
+// `Object.values` method
+// https://tc39.github.io/ecma262/#sec-object.values
+$({ target: 'Object', stat: true }, {
+  values: function values(O) {
+    return $values(O);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.reflect.construct.js":
+/*!**************************************************************!*\
+  !*** ./node_modules/core-js/modules/es.reflect.construct.js ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var getBuiltIn = __webpack_require__(/*! ../internals/get-built-in */ "./node_modules/core-js/internals/get-built-in.js");
+var aFunction = __webpack_require__(/*! ../internals/a-function */ "./node_modules/core-js/internals/a-function.js");
+var anObject = __webpack_require__(/*! ../internals/an-object */ "./node_modules/core-js/internals/an-object.js");
+var isObject = __webpack_require__(/*! ../internals/is-object */ "./node_modules/core-js/internals/is-object.js");
+var create = __webpack_require__(/*! ../internals/object-create */ "./node_modules/core-js/internals/object-create.js");
+var bind = __webpack_require__(/*! ../internals/function-bind */ "./node_modules/core-js/internals/function-bind.js");
+var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+
+var nativeConstruct = getBuiltIn('Reflect', 'construct');
+
+// `Reflect.construct` method
+// https://tc39.github.io/ecma262/#sec-reflect.construct
+// MS Edge supports only 2 arguments and argumentsList argument is optional
+// FF Nightly sets third argument as `new.target`, but does not create `this` from it
+var NEW_TARGET_BUG = fails(function () {
+  function F() { /* empty */ }
+  return !(nativeConstruct(function () { /* empty */ }, [], F) instanceof F);
+});
+var ARGS_BUG = !fails(function () {
+  nativeConstruct(function () { /* empty */ });
+});
+var FORCED = NEW_TARGET_BUG || ARGS_BUG;
+
+$({ target: 'Reflect', stat: true, forced: FORCED, sham: FORCED }, {
+  construct: function construct(Target, args /* , newTarget */) {
+    aFunction(Target);
+    anObject(args);
+    var newTarget = arguments.length < 3 ? Target : aFunction(arguments[2]);
+    if (ARGS_BUG && !NEW_TARGET_BUG) return nativeConstruct(Target, args, newTarget);
+    if (Target == newTarget) {
+      // w/o altered newTarget, optimization for 0-4 arguments
+      switch (args.length) {
+        case 0: return new Target();
+        case 1: return new Target(args[0]);
+        case 2: return new Target(args[0], args[1]);
+        case 3: return new Target(args[0], args[1], args[2]);
+        case 4: return new Target(args[0], args[1], args[2], args[3]);
+      }
+      // w/o altered newTarget, lot of arguments case
+      var $args = [null];
+      $args.push.apply($args, args);
+      return new (bind.apply(Target, $args))();
+    }
+    // with altered newTarget, not support built-in constructors
+    var proto = newTarget.prototype;
+    var instance = create(isObject(proto) ? proto : Object.prototype);
+    var result = Function.apply.call(Target, instance, args);
+    return isObject(result) ? result : instance;
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.reflect.get.js":
+/*!********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.reflect.get.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var isObject = __webpack_require__(/*! ../internals/is-object */ "./node_modules/core-js/internals/is-object.js");
+var anObject = __webpack_require__(/*! ../internals/an-object */ "./node_modules/core-js/internals/an-object.js");
+var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
+var getOwnPropertyDescriptorModule = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js");
+var getPrototypeOf = __webpack_require__(/*! ../internals/object-get-prototype-of */ "./node_modules/core-js/internals/object-get-prototype-of.js");
+
+// `Reflect.get` method
+// https://tc39.github.io/ecma262/#sec-reflect.get
+function get(target, propertyKey /* , receiver */) {
+  var receiver = arguments.length < 3 ? target : arguments[2];
+  var descriptor, prototype;
+  if (anObject(target) === receiver) return target[propertyKey];
+  if (descriptor = getOwnPropertyDescriptorModule.f(target, propertyKey)) return has(descriptor, 'value')
+    ? descriptor.value
+    : descriptor.get === undefined
+      ? undefined
+      : descriptor.get.call(receiver);
+  if (isObject(prototype = getPrototypeOf(target))) return get(prototype, propertyKey, receiver);
+}
+
+$({ target: 'Reflect', stat: true }, {
+  get: get
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.reflect.set.js":
+/*!********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.reflect.set.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var anObject = __webpack_require__(/*! ../internals/an-object */ "./node_modules/core-js/internals/an-object.js");
+var isObject = __webpack_require__(/*! ../internals/is-object */ "./node_modules/core-js/internals/is-object.js");
+var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
+var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+var definePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
+var getOwnPropertyDescriptorModule = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js");
+var getPrototypeOf = __webpack_require__(/*! ../internals/object-get-prototype-of */ "./node_modules/core-js/internals/object-get-prototype-of.js");
+var createPropertyDescriptor = __webpack_require__(/*! ../internals/create-property-descriptor */ "./node_modules/core-js/internals/create-property-descriptor.js");
+
+// `Reflect.set` method
+// https://tc39.github.io/ecma262/#sec-reflect.set
+function set(target, propertyKey, V /* , receiver */) {
+  var receiver = arguments.length < 4 ? target : arguments[3];
+  var ownDescriptor = getOwnPropertyDescriptorModule.f(anObject(target), propertyKey);
+  var existingDescriptor, prototype;
+  if (!ownDescriptor) {
+    if (isObject(prototype = getPrototypeOf(target))) {
+      return set(prototype, propertyKey, V, receiver);
+    }
+    ownDescriptor = createPropertyDescriptor(0);
+  }
+  if (has(ownDescriptor, 'value')) {
+    if (ownDescriptor.writable === false || !isObject(receiver)) return false;
+    if (existingDescriptor = getOwnPropertyDescriptorModule.f(receiver, propertyKey)) {
+      if (existingDescriptor.get || existingDescriptor.set || existingDescriptor.writable === false) return false;
+      existingDescriptor.value = V;
+      definePropertyModule.f(receiver, propertyKey, existingDescriptor);
+    } else definePropertyModule.f(receiver, propertyKey, createPropertyDescriptor(0, V));
+    return true;
+  }
+  return ownDescriptor.set === undefined ? false : (ownDescriptor.set.call(receiver, V), true);
+}
+
+// MS Edge 17-18 Reflect.set allows setting the property to object
+// with non-writable property on the prototype
+var MS_EDGE_BUG = fails(function () {
+  var object = definePropertyModule.f({}, 'a', { configurable: true });
+  // eslint-disable-next-line no-undef
+  return Reflect.set(getPrototypeOf(object), 'a', 1, object) !== false;
+});
+
+$({ target: 'Reflect', stat: true, forced: MS_EDGE_BUG }, {
+  set: set
+});
 
 
 /***/ }),
@@ -3944,8 +4622,10 @@ var defineProperty = __webpack_require__(/*! ../internals/object-define-property
 var getOwnPropertyNames = __webpack_require__(/*! ../internals/object-get-own-property-names */ "./node_modules/core-js/internals/object-get-own-property-names.js").f;
 var isRegExp = __webpack_require__(/*! ../internals/is-regexp */ "./node_modules/core-js/internals/is-regexp.js");
 var getFlags = __webpack_require__(/*! ../internals/regexp-flags */ "./node_modules/core-js/internals/regexp-flags.js");
+var stickyHelpers = __webpack_require__(/*! ../internals/regexp-sticky-helpers */ "./node_modules/core-js/internals/regexp-sticky-helpers.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
+var setInternalState = __webpack_require__(/*! ../internals/internal-state */ "./node_modules/core-js/internals/internal-state.js").set;
 var setSpecies = __webpack_require__(/*! ../internals/set-species */ "./node_modules/core-js/internals/set-species.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 
@@ -3958,7 +4638,9 @@ var re2 = /a/g;
 // "new" should create a new object, old webkit bug
 var CORRECT_NEW = new NativeRegExp(re1) !== re1;
 
-var FORCED = DESCRIPTORS && isForced('RegExp', (!CORRECT_NEW || fails(function () {
+var UNSUPPORTED_Y = stickyHelpers.UNSUPPORTED_Y;
+
+var FORCED = DESCRIPTORS && isForced('RegExp', (!CORRECT_NEW || UNSUPPORTED_Y || fails(function () {
   re2[MATCH] = false;
   // RegExp constructor can alter flags and IsRegExp works correct with @@match
   return NativeRegExp(re1) != re1 || NativeRegExp(re2) == re2 || NativeRegExp(re1, 'i') != '/a/i';
@@ -3971,13 +4653,33 @@ if (FORCED) {
     var thisIsRegExp = this instanceof RegExpWrapper;
     var patternIsRegExp = isRegExp(pattern);
     var flagsAreUndefined = flags === undefined;
-    return !thisIsRegExp && patternIsRegExp && pattern.constructor === RegExpWrapper && flagsAreUndefined ? pattern
-      : inheritIfRequired(CORRECT_NEW
-        ? new NativeRegExp(patternIsRegExp && !flagsAreUndefined ? pattern.source : pattern, flags)
-        : NativeRegExp((patternIsRegExp = pattern instanceof RegExpWrapper)
-          ? pattern.source
-          : pattern, patternIsRegExp && flagsAreUndefined ? getFlags.call(pattern) : flags)
-      , thisIsRegExp ? this : RegExpPrototype, RegExpWrapper);
+    var sticky;
+
+    if (!thisIsRegExp && patternIsRegExp && pattern.constructor === RegExpWrapper && flagsAreUndefined) {
+      return pattern;
+    }
+
+    if (CORRECT_NEW) {
+      if (patternIsRegExp && !flagsAreUndefined) pattern = pattern.source;
+    } else if (pattern instanceof RegExpWrapper) {
+      if (flagsAreUndefined) flags = getFlags.call(pattern);
+      pattern = pattern.source;
+    }
+
+    if (UNSUPPORTED_Y) {
+      sticky = !!flags && flags.indexOf('y') > -1;
+      if (sticky) flags = flags.replace(/y/g, '');
+    }
+
+    var result = inheritIfRequired(
+      CORRECT_NEW ? new NativeRegExp(pattern, flags) : NativeRegExp(pattern, flags),
+      thisIsRegExp ? this : RegExpPrototype,
+      RegExpWrapper
+    );
+
+    if (UNSUPPORTED_Y && sticky) setInternalState(result, { sticky: sticky });
+
+    return result;
   };
   var proxy = function (key) {
     key in RegExpWrapper || defineProperty(RegExpWrapper, key, {
@@ -3996,6 +4698,49 @@ if (FORCED) {
 
 // https://tc39.github.io/ecma262/#sec-get-regexp-@@species
 setSpecies('RegExp');
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.regexp.exec.js":
+/*!********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.regexp.exec.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var exec = __webpack_require__(/*! ../internals/regexp-exec */ "./node_modules/core-js/internals/regexp-exec.js");
+
+$({ target: 'RegExp', proto: true, forced: /./.exec !== exec }, {
+  exec: exec
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/es.regexp.flags.js":
+/*!*********************************************************!*\
+  !*** ./node_modules/core-js/modules/es.regexp.flags.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
+var objectDefinePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
+var regExpFlags = __webpack_require__(/*! ../internals/regexp-flags */ "./node_modules/core-js/internals/regexp-flags.js");
+var UNSUPPORTED_Y = __webpack_require__(/*! ../internals/regexp-sticky-helpers */ "./node_modules/core-js/internals/regexp-sticky-helpers.js").UNSUPPORTED_Y;
+
+// `RegExp.prototype.flags` getter
+// https://tc39.github.io/ecma262/#sec-get-regexp.prototype.flags
+if (DESCRIPTORS && (/./g.flags != 'g' || UNSUPPORTED_Y)) {
+  objectDefinePropertyModule.f(RegExp.prototype, 'flags', {
+    configurable: true,
+    get: regExpFlags
+  });
+}
 
 
 /***/ }),
@@ -4171,7 +4916,7 @@ fixRegExpWellKnownSymbolLogic('match', 1, function (MATCH, nativeMatch, maybeCal
 
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $padStart = __webpack_require__(/*! ../internals/string-pad */ "./node_modules/core-js/internals/string-pad.js").start;
-var WEBKIT_BUG = __webpack_require__(/*! ../internals/webkit-string-pad-bug */ "./node_modules/core-js/internals/webkit-string-pad-bug.js");
+var WEBKIT_BUG = __webpack_require__(/*! ../internals/string-pad-webkit-bug */ "./node_modules/core-js/internals/string-pad-webkit-bug.js");
 
 // `String.prototype.padStart` method
 // https://tc39.github.io/ecma262/#sec-string.prototype.padstart
@@ -4232,7 +4977,11 @@ var maybeToString = function (it) {
 };
 
 // @@replace logic
-fixRegExpWellKnownSymbolLogic('replace', 2, function (REPLACE, nativeReplace, maybeCallNative) {
+fixRegExpWellKnownSymbolLogic('replace', 2, function (REPLACE, nativeReplace, maybeCallNative, reason) {
+  var REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE = reason.REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE;
+  var REPLACE_KEEPS_$0 = reason.REPLACE_KEEPS_$0;
+  var UNSAFE_SUBSTITUTE = REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE ? '$' : '$0';
+
   return [
     // `String.prototype.replace` method
     // https://tc39.github.io/ecma262/#sec-string.prototype.replace
@@ -4246,8 +4995,13 @@ fixRegExpWellKnownSymbolLogic('replace', 2, function (REPLACE, nativeReplace, ma
     // `RegExp.prototype[@@replace]` method
     // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@replace
     function (regexp, replaceValue) {
-      var res = maybeCallNative(nativeReplace, regexp, this, replaceValue);
-      if (res.done) return res.value;
+      if (
+        (!REGEXP_REPLACE_SUBSTITUTES_UNDEFINED_CAPTURE && REPLACE_KEEPS_$0) ||
+        (typeof replaceValue === 'string' && replaceValue.indexOf(UNSAFE_SUBSTITUTE) === -1)
+      ) {
+        var res = maybeCallNative(nativeReplace, regexp, this, replaceValue);
+        if (res.done) return res.value;
+      }
 
       var rx = anObject(regexp);
       var S = String(this);
@@ -4533,6 +5287,50 @@ fixRegExpWellKnownSymbolLogic('split', 2, function (SPLIT, nativeSplit, maybeCal
 
 /***/ }),
 
+/***/ "./node_modules/core-js/modules/es.string.starts-with.js":
+/*!***************************************************************!*\
+  !*** ./node_modules/core-js/modules/es.string.starts-with.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
+var getOwnPropertyDescriptor = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js").f;
+var toLength = __webpack_require__(/*! ../internals/to-length */ "./node_modules/core-js/internals/to-length.js");
+var notARegExp = __webpack_require__(/*! ../internals/not-a-regexp */ "./node_modules/core-js/internals/not-a-regexp.js");
+var requireObjectCoercible = __webpack_require__(/*! ../internals/require-object-coercible */ "./node_modules/core-js/internals/require-object-coercible.js");
+var correctIsRegExpLogic = __webpack_require__(/*! ../internals/correct-is-regexp-logic */ "./node_modules/core-js/internals/correct-is-regexp-logic.js");
+var IS_PURE = __webpack_require__(/*! ../internals/is-pure */ "./node_modules/core-js/internals/is-pure.js");
+
+var nativeStartsWith = ''.startsWith;
+var min = Math.min;
+
+var CORRECT_IS_REGEXP_LOGIC = correctIsRegExpLogic('startsWith');
+// https://github.com/zloirock/core-js/pull/702
+var MDN_POLYFILL_BUG = !IS_PURE && !CORRECT_IS_REGEXP_LOGIC && !!function () {
+  var descriptor = getOwnPropertyDescriptor(String.prototype, 'startsWith');
+  return descriptor && !descriptor.writable;
+}();
+
+// `String.prototype.startsWith` method
+// https://tc39.github.io/ecma262/#sec-string.prototype.startswith
+$({ target: 'String', proto: true, forced: !MDN_POLYFILL_BUG && !CORRECT_IS_REGEXP_LOGIC }, {
+  startsWith: function startsWith(searchString /* , position = 0 */) {
+    var that = String(requireObjectCoercible(this));
+    notARegExp(searchString);
+    var index = toLength(min(arguments.length > 1 ? arguments[1] : undefined, that.length));
+    var search = String(searchString);
+    return nativeStartsWith
+      ? nativeStartsWith.call(that, search, index)
+      : that.slice(index, index + search.length) === search;
+  }
+});
+
+
+/***/ }),
+
 /***/ "./node_modules/core-js/modules/es.string.trim.js":
 /*!********************************************************!*\
   !*** ./node_modules/core-js/modules/es.string.trim.js ***!
@@ -4544,7 +5342,7 @@ fixRegExpWellKnownSymbolLogic('split', 2, function (SPLIT, nativeSplit, maybeCal
 
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var $trim = __webpack_require__(/*! ../internals/string-trim */ "./node_modules/core-js/internals/string-trim.js").trim;
-var forcedStringTrimMethod = __webpack_require__(/*! ../internals/forced-string-trim-method */ "./node_modules/core-js/internals/forced-string-trim-method.js");
+var forcedStringTrimMethod = __webpack_require__(/*! ../internals/string-trim-forced */ "./node_modules/core-js/internals/string-trim-forced.js");
 
 // `String.prototype.trim` method
 // https://tc39.github.io/ecma262/#sec-string.prototype.trim
@@ -4646,9 +5444,11 @@ defineWellKnownSymbol('iterator');
 
 var $ = __webpack_require__(/*! ../internals/export */ "./node_modules/core-js/internals/export.js");
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+var getBuiltIn = __webpack_require__(/*! ../internals/get-built-in */ "./node_modules/core-js/internals/get-built-in.js");
 var IS_PURE = __webpack_require__(/*! ../internals/is-pure */ "./node_modules/core-js/internals/is-pure.js");
 var DESCRIPTORS = __webpack_require__(/*! ../internals/descriptors */ "./node_modules/core-js/internals/descriptors.js");
 var NATIVE_SYMBOL = __webpack_require__(/*! ../internals/native-symbol */ "./node_modules/core-js/internals/native-symbol.js");
+var USE_SYMBOL_AS_UID = __webpack_require__(/*! ../internals/use-symbol-as-uid */ "./node_modules/core-js/internals/use-symbol-as-uid.js");
 var fails = __webpack_require__(/*! ../internals/fails */ "./node_modules/core-js/internals/fails.js");
 var has = __webpack_require__(/*! ../internals/has */ "./node_modules/core-js/internals/has.js");
 var isArray = __webpack_require__(/*! ../internals/is-array */ "./node_modules/core-js/internals/is-array.js");
@@ -4666,14 +5466,14 @@ var getOwnPropertySymbolsModule = __webpack_require__(/*! ../internals/object-ge
 var getOwnPropertyDescriptorModule = __webpack_require__(/*! ../internals/object-get-own-property-descriptor */ "./node_modules/core-js/internals/object-get-own-property-descriptor.js");
 var definePropertyModule = __webpack_require__(/*! ../internals/object-define-property */ "./node_modules/core-js/internals/object-define-property.js");
 var propertyIsEnumerableModule = __webpack_require__(/*! ../internals/object-property-is-enumerable */ "./node_modules/core-js/internals/object-property-is-enumerable.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var redefine = __webpack_require__(/*! ../internals/redefine */ "./node_modules/core-js/internals/redefine.js");
 var shared = __webpack_require__(/*! ../internals/shared */ "./node_modules/core-js/internals/shared.js");
 var sharedKey = __webpack_require__(/*! ../internals/shared-key */ "./node_modules/core-js/internals/shared-key.js");
 var hiddenKeys = __webpack_require__(/*! ../internals/hidden-keys */ "./node_modules/core-js/internals/hidden-keys.js");
 var uid = __webpack_require__(/*! ../internals/uid */ "./node_modules/core-js/internals/uid.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
-var wrappedWellKnownSymbolModule = __webpack_require__(/*! ../internals/wrapped-well-known-symbol */ "./node_modules/core-js/internals/wrapped-well-known-symbol.js");
+var wrappedWellKnownSymbolModule = __webpack_require__(/*! ../internals/well-known-symbol-wrapped */ "./node_modules/core-js/internals/well-known-symbol-wrapped.js");
 var defineWellKnownSymbol = __webpack_require__(/*! ../internals/define-well-known-symbol */ "./node_modules/core-js/internals/define-well-known-symbol.js");
 var setToStringTag = __webpack_require__(/*! ../internals/set-to-string-tag */ "./node_modules/core-js/internals/set-to-string-tag.js");
 var InternalStateModule = __webpack_require__(/*! ../internals/internal-state */ "./node_modules/core-js/internals/internal-state.js");
@@ -4687,8 +5487,7 @@ var setInternalState = InternalStateModule.set;
 var getInternalState = InternalStateModule.getterFor(SYMBOL);
 var ObjectPrototype = Object[PROTOTYPE];
 var $Symbol = global.Symbol;
-var JSON = global.JSON;
-var nativeJSONStringify = JSON && JSON.stringify;
+var $stringify = getBuiltIn('JSON', 'stringify');
 var nativeGetOwnPropertyDescriptor = getOwnPropertyDescriptorModule.f;
 var nativeDefineProperty = definePropertyModule.f;
 var nativeGetOwnPropertyNames = getOwnPropertyNamesExternal.f;
@@ -4727,7 +5526,7 @@ var wrap = function (tag, description) {
   return symbol;
 };
 
-var isSymbol = NATIVE_SYMBOL && typeof $Symbol.iterator == 'symbol' ? function (it) {
+var isSymbol = USE_SYMBOL_AS_UID ? function (it) {
   return typeof it == 'symbol';
 } : function (it) {
   return Object(it) instanceof $Symbol;
@@ -4822,11 +5621,19 @@ if (!NATIVE_SYMBOL) {
     return getInternalState(this).tag;
   });
 
+  redefine($Symbol, 'withoutSetter', function (description) {
+    return wrap(uid(description), description);
+  });
+
   propertyIsEnumerableModule.f = $propertyIsEnumerable;
   definePropertyModule.f = $defineProperty;
   getOwnPropertyDescriptorModule.f = $getOwnPropertyDescriptor;
   getOwnPropertyNamesModule.f = getOwnPropertyNamesExternal.f = $getOwnPropertyNames;
   getOwnPropertySymbolsModule.f = $getOwnPropertySymbols;
+
+  wrappedWellKnownSymbolModule.f = function (name) {
+    return wrap(wellKnownSymbol(name), name);
+  };
 
   if (DESCRIPTORS) {
     // https://github.com/tc39/proposal-Symbol-description
@@ -4840,10 +5647,6 @@ if (!NATIVE_SYMBOL) {
       redefine(ObjectPrototype, 'propertyIsEnumerable', $propertyIsEnumerable, { unsafe: true });
     }
   }
-
-  wrappedWellKnownSymbolModule.f = function (name) {
-    return wrap(wellKnownSymbol(name), name);
-  };
 }
 
 $({ global: true, wrap: true, forced: !NATIVE_SYMBOL, sham: !NATIVE_SYMBOL }, {
@@ -4909,39 +5712,72 @@ $({ target: 'Object', stat: true, forced: fails(function () { getOwnPropertySymb
 
 // `JSON.stringify` method behavior with symbols
 // https://tc39.github.io/ecma262/#sec-json.stringify
-JSON && $({ target: 'JSON', stat: true, forced: !NATIVE_SYMBOL || fails(function () {
-  var symbol = $Symbol();
-  // MS Edge converts symbol values to JSON as {}
-  return nativeJSONStringify([symbol]) != '[null]'
-    // WebKit converts symbol values to JSON as null
-    || nativeJSONStringify({ a: symbol }) != '{}'
-    // V8 throws on boxed symbols
-    || nativeJSONStringify(Object(symbol)) != '{}';
-}) }, {
-  stringify: function stringify(it) {
-    var args = [it];
-    var index = 1;
-    var replacer, $replacer;
-    while (arguments.length > index) args.push(arguments[index++]);
-    $replacer = replacer = args[1];
-    if (!isObject(replacer) && it === undefined || isSymbol(it)) return; // IE8 returns string on undefined
-    if (!isArray(replacer)) replacer = function (key, value) {
-      if (typeof $replacer == 'function') value = $replacer.call(this, key, value);
-      if (!isSymbol(value)) return value;
-    };
-    args[1] = replacer;
-    return nativeJSONStringify.apply(JSON, args);
-  }
-});
+if ($stringify) {
+  var FORCED_JSON_STRINGIFY = !NATIVE_SYMBOL || fails(function () {
+    var symbol = $Symbol();
+    // MS Edge converts symbol values to JSON as {}
+    return $stringify([symbol]) != '[null]'
+      // WebKit converts symbol values to JSON as null
+      || $stringify({ a: symbol }) != '{}'
+      // V8 throws on boxed symbols
+      || $stringify(Object(symbol)) != '{}';
+  });
+
+  $({ target: 'JSON', stat: true, forced: FORCED_JSON_STRINGIFY }, {
+    // eslint-disable-next-line no-unused-vars
+    stringify: function stringify(it, replacer, space) {
+      var args = [it];
+      var index = 1;
+      var $replacer;
+      while (arguments.length > index) args.push(arguments[index++]);
+      $replacer = replacer;
+      if (!isObject(replacer) && it === undefined || isSymbol(it)) return; // IE8 returns string on undefined
+      if (!isArray(replacer)) replacer = function (key, value) {
+        if (typeof $replacer == 'function') value = $replacer.call(this, key, value);
+        if (!isSymbol(value)) return value;
+      };
+      args[1] = replacer;
+      return $stringify.apply(null, args);
+    }
+  });
+}
 
 // `Symbol.prototype[@@toPrimitive]` method
 // https://tc39.github.io/ecma262/#sec-symbol.prototype-@@toprimitive
-if (!$Symbol[PROTOTYPE][TO_PRIMITIVE]) hide($Symbol[PROTOTYPE], TO_PRIMITIVE, $Symbol[PROTOTYPE].valueOf);
+if (!$Symbol[PROTOTYPE][TO_PRIMITIVE]) {
+  createNonEnumerableProperty($Symbol[PROTOTYPE], TO_PRIMITIVE, $Symbol[PROTOTYPE].valueOf);
+}
 // `Symbol.prototype[@@toStringTag]` property
 // https://tc39.github.io/ecma262/#sec-symbol.prototype-@@tostringtag
 setToStringTag($Symbol, SYMBOL);
 
 hiddenKeys[HIDDEN] = true;
+
+
+/***/ }),
+
+/***/ "./node_modules/core-js/modules/web.dom-collections.for-each.js":
+/*!**********************************************************************!*\
+  !*** ./node_modules/core-js/modules/web.dom-collections.for-each.js ***!
+  \**********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
+var DOMIterables = __webpack_require__(/*! ../internals/dom-iterables */ "./node_modules/core-js/internals/dom-iterables.js");
+var forEach = __webpack_require__(/*! ../internals/array-for-each */ "./node_modules/core-js/internals/array-for-each.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
+
+for (var COLLECTION_NAME in DOMIterables) {
+  var Collection = global[COLLECTION_NAME];
+  var CollectionPrototype = Collection && Collection.prototype;
+  // some Chrome versions have non-configurable methods on DOMTokenList
+  if (CollectionPrototype && CollectionPrototype.forEach !== forEach) try {
+    createNonEnumerableProperty(CollectionPrototype, 'forEach', forEach);
+  } catch (error) {
+    CollectionPrototype.forEach = forEach;
+  }
+}
 
 
 /***/ }),
@@ -4956,7 +5792,7 @@ hiddenKeys[HIDDEN] = true;
 var global = __webpack_require__(/*! ../internals/global */ "./node_modules/core-js/internals/global.js");
 var DOMIterables = __webpack_require__(/*! ../internals/dom-iterables */ "./node_modules/core-js/internals/dom-iterables.js");
 var ArrayIteratorMethods = __webpack_require__(/*! ../modules/es.array.iterator */ "./node_modules/core-js/modules/es.array.iterator.js");
-var hide = __webpack_require__(/*! ../internals/hide */ "./node_modules/core-js/internals/hide.js");
+var createNonEnumerableProperty = __webpack_require__(/*! ../internals/create-non-enumerable-property */ "./node_modules/core-js/internals/create-non-enumerable-property.js");
 var wellKnownSymbol = __webpack_require__(/*! ../internals/well-known-symbol */ "./node_modules/core-js/internals/well-known-symbol.js");
 
 var ITERATOR = wellKnownSymbol('iterator');
@@ -4969,15 +5805,17 @@ for (var COLLECTION_NAME in DOMIterables) {
   if (CollectionPrototype) {
     // some Chrome versions have non-configurable methods on DOMTokenList
     if (CollectionPrototype[ITERATOR] !== ArrayValues) try {
-      hide(CollectionPrototype, ITERATOR, ArrayValues);
+      createNonEnumerableProperty(CollectionPrototype, ITERATOR, ArrayValues);
     } catch (error) {
       CollectionPrototype[ITERATOR] = ArrayValues;
     }
-    if (!CollectionPrototype[TO_STRING_TAG]) hide(CollectionPrototype, TO_STRING_TAG, COLLECTION_NAME);
+    if (!CollectionPrototype[TO_STRING_TAG]) {
+      createNonEnumerableProperty(CollectionPrototype, TO_STRING_TAG, COLLECTION_NAME);
+    }
     if (DOMIterables[COLLECTION_NAME]) for (var METHOD_NAME in ArrayIteratorMethods) {
       // some Chrome versions have non-configurable methods on DOMTokenList
       if (CollectionPrototype[METHOD_NAME] !== ArrayIteratorMethods[METHOD_NAME]) try {
-        hide(CollectionPrototype, METHOD_NAME, ArrayIteratorMethods[METHOD_NAME]);
+        createNonEnumerableProperty(CollectionPrototype, METHOD_NAME, ArrayIteratorMethods[METHOD_NAME]);
       } catch (error) {
         CollectionPrototype[METHOD_NAME] = ArrayIteratorMethods[METHOD_NAME];
       }
@@ -5274,39 +6112,6 @@ webpackContext.id = "./node_modules/moment/locale sync recursive ^\\.\\/.*$";
 
 /***/ }),
 
-/***/ "./node_modules/raw-loader/index.js!./src/app/app.component.html":
-/*!**************************************************************!*\
-  !*** ./node_modules/raw-loader!./src/app/app.component.html ***!
-  \**************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-module.exports = "<link *ngIf=\"config.appCSS\" rel=\"stylesheet\" [href]=\"config.appCSS\">\n<script *ngIf=\"config.appJS\" [src]=\"config.appJS\"></script>\n<nav class=\"navbar navbar-expand-lg mb-2 {{ config.navbar }}\" *ngIf=\"hasNavBar\">\n  <div class=\"container\">\n    <a class=\"navbar-brand\" routerLink=\"{{ config.path }}\">\n      <img *ngIf=\"config.appLogo\" class=\"navbar-logo mr-3\" [ngStyle]=\"{ height : config.logoHeight }\" [src]=\"config.appLogo\" />{{ config.title }}\n    </a>\n    <button class=\"navbar-toggler\" type=\"button\" data-toggle=\"collapse\" data-target=\"#navbarNav\" aria-controls=\"navbarNav\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n      <span class=\"navbar-toggler-icon\"></span>\n    </button>\n    <div class=\"collapse navbar-collapse\" id=\"navbarNav\">\n      <ul class=\"navbar-nav mr-auto\">\n        <li class=\"nav-item\" *ngIf=\"config.needsRefresh\"><a class=\"nav-link\" (click)=\"config.reload($event)\"><i class=\"fa fa-refresh\"></i></a></li>\n        <li class=\"nav-item\" routerLinkActive=\"active\" *ngIf=\"auth.authenticated || (offlineService.offlineCount > 0)\">\n          <a class=\"nav-link\" routerLink=\"/{{ config.path }}/submission\"><i class=\"fa fa-table\"></i> Submissions</a>\n        </li>\n      </ul>\n      <ul class=\"navbar-nav\">\n        <li class=\"nav-item\" routerLinkActive=\"active\">\n          <a class=\"nav-link\" routerLink=\"/{{ config.path }}/offline\" #offline></a>\n        </li>\n        <li class=\"nav-item\" routerLinkActive=\"active\" *ngIf=\"config.path\">\n          <a *ngIf=\"!auth.authenticated\" class=\"nav-link\" routerLink=\"auth\"><i class=\"fa fa-sign-in\"></i> Login</a>\n          <a *ngIf=\"auth.authenticated\" class=\"nav-link\" routerLink=\"auth\" (click)=\"auth.logout()\"><i class=\"fa fa-sign-out\"></i> Logout</a>\n        </li>\n      </ul>\n    </div>\n  </div>\n</nav>\n<div [ngClass]=\"{'container': !config.query?.iframe, 'container-fluid iframe-container': config.query?.iframe}\" class=\"main\">\n  <div class=\"alert alert-info\" *ngIf=\"!isOnline\">\n    <h5 class=\"alert-heading\"><i class=\"fa fa-info-circle\"></i> You are currently offline</h5>\n    <p class=\"mb-0\">All submissions will be saved locally and can be synced when you are back online.</p>\n  </div>\n  <div *ngIf=\"hasNavBar\">\n    <a class=\"nav-link\" routerLink=\"/{{ config.path }}/offline\" #offline></a>\n  </div>\n  <router-outlet></router-outlet>\n  <p *ngIf=\"config.allowSwitch && !config.query?.iframe\" class=\"text-right text-muted mt-2 mb-0\" style=\"cursor:pointer;\" (click)=\"refreshApp()\"><i class=\"fa fa-exchange mr-1\"></i> Change form</p>\n</div>\n<hr *ngIf=\"config.branding\" />\n<h4 *ngIf=\"config.branding\" class=\"text-center text-muted\">powered by <img src=\"assets/logo.png\" class=\"mr-2\" style=\"height: 1.2em;\" /></h4>\n<p class=\"text-center text-muted mb-0\" style=\"font-size: 0.8em\">Copyright © Form.io LLC 2019. All rights reserved</p>\n<p class=\"text-center text-muted mb-0\" style=\"font-size: 0.8em\">Version v{{ appVersion }}, Renderer v{{ rendererVersion }}</p>\n"
-
-/***/ }),
-
-/***/ "./node_modules/raw-loader/index.js!./src/app/form/form.component.html":
-/*!********************************************************************!*\
-  !*** ./node_modules/raw-loader!./src/app/form/form.component.html ***!
-  \********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-module.exports = "<div class=\"loader\" *ngIf=\"formLoading\"></div>\n<div class=\"card bg-light\" *ngIf=\"!formLoading && !canSubmit\">\n  <div class=\"card-body\">You cannot submit this form. Please log in as a different user.</div>\n</div>\n<div class=\"alert alert-success\" *ngIf=\"!formLoading && submissionComplete\">\n  Submission Complete!\n</div>\n<formio\n  *ngIf=\"canSubmit && !submissionComplete\"\n  [form]=\"config.currentForm\"\n  [submission]=\"submission\"\n  [success]=\"success\"\n  [error]=\"error\"\n  (change)=\"onChange($event)\"\n  (submit)=\"onSubmit($event)\"\n></formio>\n"
-
-/***/ }),
-
-/***/ "./node_modules/raw-loader/index.js!./src/app/home/home.component.html":
-/*!********************************************************************!*\
-  !*** ./node_modules/raw-loader!./src/app/home/home.component.html ***!
-  \********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-module.exports = "<div class=\"card bg-light src-form\">\n  <div class=\"card-body\">\n    <div class=\"alert alert-success\" *ngIf=\"alert\">{{ alert }}</div>\n    <div class=\"input-group\">\n      <div class=\"input-group-prepend\">\n        <label for=\"formsrc\" class=\"input-group-text\"><strong>Form Embed URL</strong></label>\n      </div>\n      <input type=\"text\" class=\"form-control\" id=\"formsrc\" name=\"formsrc\" #formsrc placeholder=\"https://examples.form.io/example\" (input)=\"onChange($event)\">\n      <div class=\"input-group-append\">\n        <button class=\"btn btn-primary\" (click)=\"showForm()\"><span class=\"fa fa-check-square-o\"></span> Show Form</button>\n      </div>\n    </div>\n    <div class=\"input-group mt-3\">\n      <div class=\"input-group-prepend\">\n        <label class=\"input-group-text\" for=\"themeSelect\"><strong>Theme</strong></label>\n      </div>\n      <select class=\"custom-select\" id=\"themeSelect\" (change)=\"onTheme($event)\">\n        <option *ngFor=\"let theme of themes\" [value]=\"theme.name\">{{ theme.label }}</option>\n      </select>\n    </div>\n    <div class=\"input-group mt-3\" *ngIf=\"shareUrl\">\n      <div class=\"input-group-prepend\">\n        <span class=\"input-group-text\"><strong>Share URL</strong></span>\n      </div>\n      <input class=\"form-control\" type=\"text\" [value]=\"shareUrl\" (click)=\"copyToClipboard()\" #copy />\n      <div class=\"input-group-append\">\n        <button class=\"btn btn-primary\" type=\"button\" (click)=\"copyToClipboard()\"><i class=\"fa fa-clipboard\"></i></button>\n        <button class=\"btn btn-primary\" type=\"button\" (click)=\"gotoForm()\"><i class=\"fa fa-share\"></i></button>\n      </div>\n    </div>\n  </div>\n</div>\n<div class=\"card bg-light mt-2\" *ngIf=\"formSrc\">\n  <div class=\"card-header\">\n    <h4 class=\"card-title mb-0\">Form Preview</h4>\n  </div>\n  <div class=\"card-body\">\n    <formio [src]=\"formSrc\" (formLoad)=\"onFormLoad($event)\"></formio>\n  </div>\n</div>\n"
-
-/***/ }),
-
 /***/ "./package.json":
 /*!**********************!*\
   !*** ./package.json ***!
@@ -5314,7 +6119,7 @@ module.exports = "<div class=\"card bg-light src-form\">\n  <div class=\"card-bo
 /*! exports provided: name, version, scripts, private, dependencies, devDependencies, default */
 /***/ (function(module) {
 
-module.exports = {"name":"pro.formview.io","version":"1.37.0","scripts":{"ng":"ng","start":"ng serve","build":"gulp build && ng build","build:prod":"gulp build && ng build --prod","test":"ng test","lint":"ng lint","e2e":"ng e2e","deploy":"npm run build:prod && gulp deploy:test","deploy:prod":"npm run build:prod && gulp deploy:prod"},"private":true,"dependencies":{"@angular/animations":"^8.0.3","@angular/common":"^8.0.3","@angular/compiler":"^8.0.3","@angular/core":"^8.0.3","@angular/forms":"^8.0.3","@angular/platform-browser":"^8.0.3","@angular/platform-browser-dynamic":"^8.0.3","@angular/pwa":"^0.800.6","@angular/router":"^8.0.3","@angular/service-worker":"^8.0.3","angular-formio":"^3.24.0","bootstrap":"^4.3.1","bootswatch":"^4.3.1","classlist.js":"^1.1.20150312","core-js":"^3.1.4","font-awesome":"^4.7.0","formio-plugin-offline":"formio/formio-plugin-offline#v2.14.2","formiojs":"^3.22.15","jquery":"^3.4.1","lodash":"^4.17.11","ngx-toastr":"^10.0.4","rxjs":"^6.5.2","seamless":"^1.4.1","tslib":"^1.10.0","zone.js":"^0.9.1"},"devDependencies":{"@angular-devkit/build-angular":"^0.800.6","@angular/cli":"^8.0.6","@angular/compiler-cli":"^8.0.3","@angular/language-service":"^8.0.3","@types/jasmine":"^3.3.13","@types/jasminewd2":"~2.0.3","@types/node":"^12.0.10","codelyzer":"^5.1.0","del":"^4.1.1","gulp":"^4.0.2","gulp-s3":"^0.11.0","jasmine-core":"^3.4.0","jasmine-spec-reporter":"~4.2.1","karma":"^4.1.0","karma-chrome-launcher":"~2.2.0","karma-coverage-istanbul-reporter":"^2.0.5","karma-jasmine":"^2.0.1","karma-jasmine-html-reporter":"^1.4.2","protractor":"^5.4.2","ts-node":"^8.3.0","tslint":"^5.18.0","typescript":"3.4.5"}};
+module.exports = JSON.parse("{\"name\":\"pro.formview.io\",\"version\":\"1.74.0\",\"scripts\":{\"ng\":\"ng\",\"start\":\"ng serve\",\"build\":\"gulp build && ng build\",\"build:prod\":\"gulp build && ng build --prod\",\"test\":\"ng test\",\"lint\":\"ng lint\",\"e2e\":\"ng e2e\",\"deploy\":\"npm run build:prod && gulp deploy:test\",\"deploy:prod\":\"npm run build:prod && gulp deploy:prod\"},\"private\":true,\"dependencies\":{\"@angular/animations\":\"^9.0.7\",\"@angular/common\":\"^9.0.7\",\"@angular/compiler\":\"^9.0.7\",\"@angular/core\":\"^9.0.7\",\"@angular/elements\":\"^9.0.7\",\"@angular/forms\":\"^9.0.7\",\"@angular/platform-browser\":\"^9.0.7\",\"@angular/platform-browser-dynamic\":\"^9.0.7\",\"@angular/router\":\"^9.0.7\",\"@angular/service-worker\":\"^9.0.7\",\"@formio/premium\":\"github:formio/premium#v1.5.0\",\"angular-formio\":\"^4.6.16\",\"bootstrap\":\"^4.4.1\",\"bootswatch\":\"^4.4.1\",\"classlist.js\":\"^1.1.20150312\",\"core-js\":\"^3.6.4\",\"font-awesome\":\"^4.7.0\",\"formio-plugin-offline\":\"formio/formio-plugin-offline#v2.15.0\",\"formiojs\":\"^4.9.4\",\"jquery\":\"^3.4.1\",\"lodash\":\"^4.17.15\",\"ngx-toastr\":\"^12.0.0\",\"rxjs\":\"^6.5.4\",\"seamless\":\"^1.4.1\",\"tslib\":\"^1.11.1\",\"zone.js\":\"^0.10.3\"},\"devDependencies\":{\"@angular-devkit/build-angular\":\"^0.901.0-next.4\",\"@angular/cli\":\"^9.1.0-next.1\",\"@angular/compiler-cli\":\"^9.0.7\",\"@angular/language-service\":\"^9.0.7\",\"@types/jasmine\":\"^3.5.9\",\"@types/jasminewd2\":\"^2.0.8\",\"@types/node\":\"^13.9.2\",\"codelyzer\":\"^5.1.2\",\"del\":\"^5.1.0\",\"gulp\":\"^4.0.2\",\"gulp-s3\":\"^0.11.0\",\"jasmine-core\":\"^3.5.0\",\"jasmine-spec-reporter\":\"~4.2.1\",\"karma\":\"^4.4.1\",\"karma-chrome-launcher\":\"^3.1.0\",\"karma-coverage-istanbul-reporter\":\"^2.1.1\",\"karma-jasmine\":\"^3.1.1\",\"karma-jasmine-html-reporter\":\"^1.5.2\",\"protractor\":\"^5.4.3\",\"ts-node\":\"^8.8.1\",\"tslint\":\"^6.1.0\",\"typescript\":\"~3.7.5\"}}");
 
 /***/ }),
 
@@ -5323,41 +6128,21 @@ module.exports = {"name":"pro.formview.io","version":"1.37.0","scripts":{"ng":"n
   !*** ./src/$$_lazy_route_resource lazy namespace object ***!
   \**********************************************************/
 /*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, exports) {
 
-var map = {
-	"./auth/auth.module": [
-		"./src/app/auth/auth.module.ts",
-		"auth-auth-module"
-	],
-	"./form/submission/submission.module": [
-		"./src/app/form/submission/submission.module.ts",
-		"form-submission-submission-module"
-	],
-	"./offline/offline.module": [
-		"./src/app/offline/offline.module.ts",
-		"offline-offline-module"
-	]
-};
-function webpackAsyncContext(req) {
-	if(!__webpack_require__.o(map, req)) {
-		return Promise.resolve().then(function() {
-			var e = new Error("Cannot find module '" + req + "'");
-			e.code = 'MODULE_NOT_FOUND';
-			throw e;
-		});
-	}
-
-	var ids = map[req], id = ids[0];
-	return __webpack_require__.e(ids[1]).then(function() {
-		return __webpack_require__(id);
+function webpackEmptyAsyncContext(req) {
+	// Here Promise.resolve().then() is used instead of new Promise() to prevent
+	// uncaught exception popping up in devtools
+	return Promise.resolve().then(function() {
+		var e = new Error("Cannot find module '" + req + "'");
+		e.code = 'MODULE_NOT_FOUND';
+		throw e;
 	});
 }
-webpackAsyncContext.keys = function webpackAsyncContextKeys() {
-	return Object.keys(map);
-};
-webpackAsyncContext.id = "./src/$$_lazy_route_resource lazy recursive";
-module.exports = webpackAsyncContext;
+webpackEmptyAsyncContext.keys = function() { return []; };
+webpackEmptyAsyncContext.resolve = webpackEmptyAsyncContext;
+module.exports = webpackEmptyAsyncContext;
+webpackEmptyAsyncContext.id = "./src/$$_lazy_route_resource lazy recursive";
 
 /***/ }),
 
@@ -5372,38 +6157,27 @@ module.exports = webpackAsyncContext;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AuthService", function() { return AuthService; });
 /* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
-/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
-/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(lodash_get__WEBPACK_IMPORTED_MODULE_4__);
-
+/* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
+/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
+/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(lodash_get__WEBPACK_IMPORTED_MODULE_3__);
 
 
 
 
 var AuthService = /** @class */ (function (_super) {
-    tslib__WEBPACK_IMPORTED_MODULE_0__["__extends"](AuthService, _super);
+    Object(tslib__WEBPACK_IMPORTED_MODULE_0__["__extends"])(AuthService, _super);
     function AuthService(appConfig, config) {
         var _this = _super.call(this, appConfig, config) || this;
         _this.appConfig = appConfig;
         _this.config = config;
         _this.appConfig.form.subscribe(function () {
-            _this.loginForm = _this.appConfig.appUrl + '/' + lodash_get__WEBPACK_IMPORTED_MODULE_4___default()(_this.config, 'login.form', 'user/login');
+            _this.loginForm = _this.appConfig.appUrl + '/' + lodash_get__WEBPACK_IMPORTED_MODULE_3___default()(_this.config, 'login.form', 'user/login');
         });
         return _this;
     }
-    AuthService.ctorParameters = function () { return [
-        { type: _config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"] },
-        { type: angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__["FormioAuthConfig"] }
-    ]; };
-    AuthService = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Injectable"])(),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [_config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"],
-            angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__["FormioAuthConfig"]])
-    ], AuthService);
     return AuthService;
-}(angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__["FormioAuthService"]));
+}(angular_formio_auth__WEBPACK_IMPORTED_MODULE_1__["FormioAuthService"]));
 
 
 
@@ -5413,72 +6187,169 @@ var AuthService = /** @class */ (function (_super) {
 /*!***************************************!*\
   !*** ./src/app/app-routing.module.ts ***!
   \***************************************/
-/*! exports provided: AppRoutingModule */
+/*! exports provided: AppRoutingModule, ɵ0, ɵ1, ɵ2 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppRoutingModule", function() { return AppRoutingModule; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
-/* harmony import */ var _form_form_component__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./form/form.component */ "./src/app/form/form.component.ts");
-/* harmony import */ var _home_home_component__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./home/home.component */ "./src/app/home/home.component.ts");
-
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ɵ0", function() { return ɵ0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ɵ1", function() { return ɵ1; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ɵ2", function() { return ɵ2; });
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _form_form_component__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./form/form.component */ "./src/app/form/form.component.ts");
+/* harmony import */ var _home_home_component__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./home/home.component */ "./src/app/home/home.component.ts");
+/* harmony import */ var _form_thanks_thanks_component__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./form/thanks/thanks.component */ "./src/app/form/thanks/thanks.component.ts");
 
 
 
 
 var rootPath = window.PROJECT_URL ? 'form/' : ':project/';
+var ɵ0 = function () { return __webpack_require__.e(/*! import() | auth-auth-module-ngfactory */ "auth-auth-module-ngfactory").then(__webpack_require__.bind(null, /*! ./auth/auth.module.ngfactory */ "./src/app/auth/auth.module.ngfactory.js")).then(function (m) { return m.AuthModuleNgFactory; }); }, ɵ1 = function () { return Promise.all(/*! import() | form-submission-submission-module-ngfactory */[__webpack_require__.e("default~form-submission-submission-module-ngfactory~offline-offline-module-ngfactory"), __webpack_require__.e("form-submission-submission-module-ngfactory")]).then(__webpack_require__.bind(null, /*! ./form/submission/submission.module.ngfactory */ "./src/app/form/submission/submission.module.ngfactory.js")).then(function (m) { return m.SubmissionModuleNgFactory; }); }, ɵ2 = function () { return Promise.all(/*! import() | offline-offline-module-ngfactory */[__webpack_require__.e("default~form-submission-submission-module-ngfactory~offline-offline-module-ngfactory"), __webpack_require__.e("offline-offline-module-ngfactory")]).then(__webpack_require__.bind(null, /*! ./offline/offline.module.ngfactory */ "./src/app/offline/offline.module.ngfactory.js")).then(function (m) { return m.OfflineModuleNgFactory; }); };
 var routes = [
     {
         path: '',
-        component: _home_home_component__WEBPACK_IMPORTED_MODULE_4__["HomeComponent"]
+        component: _home_home_component__WEBPACK_IMPORTED_MODULE_2__["HomeComponent"]
     },
     {
         path: 'auth',
-        loadChildren: './auth/auth.module#AuthModule'
+        loadChildren: ɵ0
     },
     {
         path: rootPath + ":form",
-        component: _form_form_component__WEBPACK_IMPORTED_MODULE_3__["FormComponent"]
+        component: _form_form_component__WEBPACK_IMPORTED_MODULE_1__["FormComponent"]
     },
     {
         path: rootPath + ":form/submission",
-        loadChildren: './form/submission/submission.module#SubmissionModule'
+        loadChildren: ɵ1
+    },
+    {
+        path: rootPath + ":form/thanks",
+        component: _form_thanks_thanks_component__WEBPACK_IMPORTED_MODULE_3__["ThanksComponent"]
     },
     {
         path: rootPath + ":form/offline",
-        loadChildren: './offline/offline.module#OfflineModule'
+        loadChildren: ɵ2
     }
 ];
 var AppRoutingModule = /** @class */ (function () {
     function AppRoutingModule() {
     }
-    AppRoutingModule = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["NgModule"])({
-            imports: [_angular_router__WEBPACK_IMPORTED_MODULE_2__["RouterModule"].forRoot(routes, {
-                    useHash: true,
-                    preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_2__["PreloadAllModules"]
-                })],
-            exports: [_angular_router__WEBPACK_IMPORTED_MODULE_2__["RouterModule"]]
-        })
-    ], AppRoutingModule);
     return AppRoutingModule;
 }());
 
 
 
+
 /***/ }),
 
-/***/ "./src/app/app.component.scss":
-/*!************************************!*\
-  !*** ./src/app/app.component.scss ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ "./src/app/app.component.ngfactory.js":
+/*!********************************************!*\
+  !*** ./src/app/app.component.ngfactory.js ***!
+  \********************************************/
+/*! exports provided: RenderType_AppComponent, View_AppComponent_0, View_AppComponent_Host_0, AppComponentNgFactory */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
 
-module.exports = ".iframe-container {\n  margin: 0;\n  padding: 0;\n}\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy90cmF2aXN0aWR3ZWxsL0RvY3VtZW50cy9mb3JtaW8vZm9ybWlvLWFwcHMvcHJvLmZvcm12aWV3LmlvL3NyYy9hcHAvYXBwLmNvbXBvbmVudC5zY3NzIiwic3JjL2FwcC9hcHAuY29tcG9uZW50LnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7RUFDRSxTQUFBO0VBQ0EsVUFBQTtBQ0NGIiwiZmlsZSI6InNyYy9hcHAvYXBwLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiLmlmcmFtZS1jb250YWluZXIge1xuICBtYXJnaW46IDA7XG4gIHBhZGRpbmc6IDA7XG59XG4iLCIuaWZyYW1lLWNvbnRhaW5lciB7XG4gIG1hcmdpbjogMDtcbiAgcGFkZGluZzogMDtcbn0iXX0= */"
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RenderType_AppComponent", function() { return RenderType_AppComponent; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_AppComponent_0", function() { return View_AppComponent_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_AppComponent_Host_0", function() { return View_AppComponent_Host_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppComponentNgFactory", function() { return AppComponentNgFactory; });
+/* harmony import */ var _app_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./app.component.scss.shim.ngstyle */ "./src/app/app.component.scss.shim.ngstyle.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _app_component__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./app.component */ "./src/app/app.component.ts");
+/* harmony import */ var angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! angular-formio/auth/auth.service */ "./node_modules/angular-formio/auth/auth.service.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
+/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./offline/offline.service */ "./src/app/offline/offline.service.ts");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+
+
+
+
+
+
+
+
+
+var styles_AppComponent = [_app_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__["styles"]];
+var RenderType_AppComponent = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵcrt"]({ encapsulation: 0, styles: styles_AppComponent, data: {} });
+
+function View_AppComponent_1(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 0, "link", [["rel", "stylesheet"]], [[8, "href", 5]], null, null, null, null))], null, function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.config.appCSS; _ck(_v, 0, 0, currVal_0); }); }
+function View_AppComponent_3(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "img", [["class", "navbar-logo mr-3"]], [[8, "src", 4]], null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 278528, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgStyle"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["KeyValueDiffers"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"]], { ngStyle: [0, "ngStyle"] }, null), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵpod"](2, { height: 0 })], function (_ck, _v) { var _co = _v.component; var currVal_1 = _ck(_v, 2, 0, _co.config.logoHeight); _ck(_v, 1, 0, currVal_1); }, function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.config.appLogo; _ck(_v, 0, 0, currVal_0); }); }
+function View_AppComponent_4(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "li", [["class", "nav-item"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 1, "a", [["class", "nav-link"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.config.reload($event) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 0, "i", [["class", "fa fa-refresh"]], null, null, null, null, null))], null, null); }
+function View_AppComponent_5(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 6, "li", [["class", "nav-item"], ["routerLinkActive", "active"]], null, null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 1720320, null, 2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkActive"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLink"]], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"]]], { routerLinkActive: [0, "routerLinkActive"] }, null), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 2, { links: 1 }), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 3, { linksWithHrefs: 1 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](4, 0, null, null, 2, "a", [["class", "nav-link"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.goToSubmissions() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](5, 0, null, null, 0, "i", [["class", "fa fa-table"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Submissions"]))], function (_ck, _v) { var currVal_0 = "active"; _ck(_v, 1, 0, currVal_0); }, null); }
+function View_AppComponent_7(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 3, "a", [["class", "nav-link"], ["routerLink", "auth"]], [[1, "target", 0], [8, "href", 4]], [[null, "click"]], function (_v, en, $event) { var ad = true; if (("click" === en)) {
+        var pd_0 = (_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).onClick($event.button, $event.ctrlKey, $event.metaKey, $event.shiftKey) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 671744, [[7, 4]], 0, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_3__["ActivatedRoute"], _angular_common__WEBPACK_IMPORTED_MODULE_2__["LocationStrategy"]], { routerLink: [0, "routerLink"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 0, "i", [["class", "fa fa-sign-in"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Login"]))], function (_ck, _v) { var currVal_2 = "auth"; _ck(_v, 1, 0, currVal_2); }, function (_ck, _v) { var currVal_0 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).target; var currVal_1 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).href; _ck(_v, 0, 0, currVal_0, currVal_1); }); }
+function View_AppComponent_8(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 3, "a", [["class", "nav-link"], ["routerLink", "auth"]], [[1, "target", 0], [8, "href", 4]], [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).onClick($event.button, $event.ctrlKey, $event.metaKey, $event.shiftKey) !== false);
+        ad = (pd_0 && ad);
+    } if (("click" === en)) {
+        var pd_1 = (_co.auth.logout() !== false);
+        ad = (pd_1 && ad);
+    } return ad; }, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 671744, [[7, 4]], 0, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_3__["ActivatedRoute"], _angular_common__WEBPACK_IMPORTED_MODULE_2__["LocationStrategy"]], { routerLink: [0, "routerLink"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 0, "i", [["class", "fa fa-sign-out"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Logout"]))], function (_ck, _v) { var currVal_2 = "auth"; _ck(_v, 1, 0, currVal_2); }, function (_ck, _v) { var currVal_0 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).target; var currVal_1 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 1).href; _ck(_v, 0, 0, currVal_0, currVal_1); }); }
+function View_AppComponent_6(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 7, "li", [["class", "nav-item"], ["routerLinkActive", "active"]], null, null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 1720320, null, 2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkActive"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLink"]], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"]]], { routerLinkActive: [0, "routerLinkActive"] }, null), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 6, { links: 1 }), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 7, { linksWithHrefs: 1 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_7)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](5, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_8)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](7, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null)], function (_ck, _v) { var _co = _v.component; var currVal_0 = "active"; _ck(_v, 1, 0, currVal_0); var currVal_1 = !_co.auth.authenticated; _ck(_v, 5, 0, currVal_1); var currVal_2 = _co.auth.authenticated; _ck(_v, 7, 0, currVal_2); }, null); }
+function View_AppComponent_2(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 21, "nav", [], [[8, "className", 0]], null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 20, "div", [["class", "container"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 3, "a", [["class", "navbar-brand"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.goToForm() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_3)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](4, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](5, null, ["", " "])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](6, 0, null, null, 1, "button", [["aria-controls", "navbarNav"], ["aria-expanded", "false"], ["aria-label", "Toggle navigation"], ["class", "navbar-toggler"], ["data-target", "#navbarNav"], ["data-toggle", "collapse"], ["type", "button"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](7, 0, null, null, 0, "span", [["class", "navbar-toggler-icon"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](8, 0, null, null, 13, "div", [["class", "collapse navbar-collapse"], ["id", "navbarNav"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](9, 0, null, null, 4, "ul", [["class", "navbar-nav mr-auto"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_4)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](11, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_5)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](13, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](14, 0, null, null, 7, "ul", [["class", "navbar-nav"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](15, 0, null, null, 4, "li", [["class", "nav-item"], ["routerLinkActive", "active"]], null, null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](16, 1720320, null, 2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkActive"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLink"]], [2, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"]]], { routerLinkActive: [0, "routerLinkActive"] }, null), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 4, { links: 1 }), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](603979776, 5, { linksWithHrefs: 1 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](19, 0, [[1, 0], ["offline", 1]], null, 0, "a", [["class", "nav-link"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.goToOffline() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_6)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](21, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null)], function (_ck, _v) { var _co = _v.component; var currVal_1 = _co.config.appLogo; _ck(_v, 4, 0, currVal_1); var currVal_3 = _co.config.needsRefresh; _ck(_v, 11, 0, currVal_3); var currVal_4 = (_co.auth.authenticated || (_co.offlineService.offlineCount > 0)); _ck(_v, 13, 0, currVal_4); var currVal_5 = "active"; _ck(_v, 16, 0, currVal_5); var currVal_6 = _co.config.path; _ck(_v, 21, 0, currVal_6); }, function (_ck, _v) { var _co = _v.component; var currVal_0 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵinlineInterpolate"](1, "navbar navbar-expand-lg mb-2 ", _co.config.navbar, ""); _ck(_v, 0, 0, currVal_0); var currVal_2 = _co.config.title; _ck(_v, 5, 0, currVal_2); }); }
+function View_AppComponent_9(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 5, "div", [["class", "alert alert-info"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 2, "h5", [["class", "alert-heading"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 0, "i", [["class", "fa fa-info-circle"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" You are currently offline"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](4, 0, null, null, 1, "p", [["class", "mb-0"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["All submissions will be saved locally and can be synced when you are back online."]))], null, null); }
+function View_AppComponent_10(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "div", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, [[1, 0], ["offline", 1]], null, 1, "a", [["class", "nav-link"]], [[1, "target", 0], [8, "href", 4]], [[null, "click"]], function (_v, en, $event) { var ad = true; if (("click" === en)) {
+        var pd_0 = (_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 2).onClick($event.button, $event.ctrlKey, $event.metaKey, $event.shiftKey) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](2, 671744, null, 0, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLinkWithHref"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_3__["ActivatedRoute"], _angular_common__WEBPACK_IMPORTED_MODULE_2__["LocationStrategy"]], { routerLink: [0, "routerLink"] }, null)], function (_ck, _v) { var _co = _v.component; var currVal_2 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵinlineInterpolate"](1, "/", _co.config.path, "/offline"); _ck(_v, 2, 0, currVal_2); }, function (_ck, _v) { var currVal_0 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 2).target; var currVal_1 = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 2).href; _ck(_v, 1, 0, currVal_0, currVal_1); }); }
+function View_AppComponent_11(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "p", [["class", "text-right text-muted mt-2 mb-0"], ["style", "cursor:pointer;"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.refreshApp() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 0, "i", [["class", "fa fa-exchange mr-1"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Change form"]))], null, null); }
+function View_AppComponent_12(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 0, "hr", [], null, null, null, null, null))], null, null); }
+function View_AppComponent_13(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "h4", [["class", "text-center text-muted"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["powered by "])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 0, "img", [["class", "mr-2"], ["src", "assets/logo.png"], ["style", "height: 1.2em;"]], null, null, null, null, null))], null, null); }
+function View_AppComponent_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](671088640, 1, { offline: 0 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_1)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](2, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_2)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](4, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](5, 0, null, null, 10, "div", [["class", "main"]], null, null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](6, 278528, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgClass"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["IterableDiffers"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["KeyValueDiffers"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"]], { klass: [0, "klass"], ngClass: [1, "ngClass"] }, null), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵpod"](7, { "container": 0, "container-fluid iframe-container": 1 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_9)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](9, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_10)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](11, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](12, 16777216, null, null, 1, "router-outlet", [], null, null, null, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](13, 212992, null, 0, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterOutlet"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["ChildrenOutletContexts"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ComponentFactoryResolver"], [8, null], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ChangeDetectorRef"]], null, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_11)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](15, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_12)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](17, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_AppComponent_13)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](19, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](20, 0, null, null, 1, "p", [["class", "text-center text-muted mb-0"], ["style", "font-size: 0.8em"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Copyright \u00A9 Form.io LLC 2019. All rights reserved"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](22, 0, null, null, 1, "p", [["class", "text-center text-muted mb-0"], ["style", "font-size: 0.8em"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](23, null, ["Version v", ", Renderer v", ""]))], function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.config.appCSS; _ck(_v, 2, 0, currVal_0); var currVal_1 = _co.hasNavBar; _ck(_v, 4, 0, currVal_1); var currVal_2 = "main"; var currVal_3 = _ck(_v, 7, 0, !((_co.config.query == null) ? null : _co.config.query.iframe), ((_co.config.query == null) ? null : _co.config.query.iframe)); _ck(_v, 6, 0, currVal_2, currVal_3); var currVal_4 = !_co.isOnline; _ck(_v, 9, 0, currVal_4); var currVal_5 = _co.hasNavBar; _ck(_v, 11, 0, currVal_5); _ck(_v, 13, 0); var currVal_6 = (_co.config.allowSwitch && !((_co.config.query == null) ? null : _co.config.query.iframe)); _ck(_v, 15, 0, currVal_6); var currVal_7 = _co.config.branding; _ck(_v, 17, 0, currVal_7); var currVal_8 = _co.config.branding; _ck(_v, 19, 0, currVal_8); }, function (_ck, _v) { var _co = _v.component; var currVal_9 = _co.appVersion; var currVal_10 = _co.rendererVersion; _ck(_v, 23, 0, currVal_9, currVal_10); }); }
+function View_AppComponent_Host_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "app-root", [], null, null, null, View_AppComponent_0, RenderType_AppComponent)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 4243456, null, 0, _app_component__WEBPACK_IMPORTED_MODULE_4__["AppComponent"], [angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_5__["FormioAuthService"], _angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _config__WEBPACK_IMPORTED_MODULE_6__["AppConfig"], _offline_offline_service__WEBPACK_IMPORTED_MODULE_7__["OfflineService"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ChangeDetectorRef"], ngx_toastr__WEBPACK_IMPORTED_MODULE_8__["ToastrService"]], null, null)], null, null); }
+var AppComponentNgFactory = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵccf"]("app-root", _app_component__WEBPACK_IMPORTED_MODULE_4__["AppComponent"], View_AppComponent_Host_0, {}, {}, []);
+
+
+
+/***/ }),
+
+/***/ "./src/app/app.component.scss.shim.ngstyle.js":
+/*!****************************************************!*\
+  !*** ./src/app/app.component.scss.shim.ngstyle.js ***!
+  \****************************************************/
+/*! exports provided: styles */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "styles", function() { return styles; });
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+var styles = [".iframe-container[_ngcontent-%COMP%] {\n  margin: 0;\n  padding: 0;\n}\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIi9Vc2Vycy90cmF2aXN0aWR3ZWxsL0RvY3VtZW50cy9mb3JtaW8vZm9ybWlvLWFwcHMvcHJvLmZvcm12aWV3LmlvL3NyYy9hcHAvYXBwLmNvbXBvbmVudC5zY3NzIiwic3JjL2FwcC9hcHAuY29tcG9uZW50LnNjc3MiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7RUFDRSxTQUFBO0VBQ0EsVUFBQTtBQ0NGIiwiZmlsZSI6InNyYy9hcHAvYXBwLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiLmlmcmFtZS1jb250YWluZXIge1xuICBtYXJnaW46IDA7XG4gIHBhZGRpbmc6IDA7XG59XG4iLCIuaWZyYW1lLWNvbnRhaW5lciB7XG4gIG1hcmdpbjogMDtcbiAgcGFkZGluZzogMDtcbn0iXX0= */"];
+
+
 
 /***/ }),
 
@@ -5492,12 +6363,14 @@ module.exports = ".iframe-container {\n  margin: 0;\n  padding: 0;\n}\n/*# sourc
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppComponent", function() { return AppComponent; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
+/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
 /* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 /* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
 /* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./offline/offline.service */ "./src/app/offline/offline.service.ts");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
+
 
 
 
@@ -5507,70 +6380,194 @@ __webpack_require__.r(__webpack_exports__);
 var _get = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
 var packageJSON = __webpack_require__(/*! ../../package.json */ "./package.json");
 var AppComponent = /** @class */ (function () {
-    function AppComponent(auth, router, config, offlineService, ref) {
+    function AppComponent(auth, router, config, offlineService, ref, toastr) {
         var _this = this;
         this.auth = auth;
         this.router = router;
         this.config = config;
         this.offlineService = offlineService;
         this.ref = ref;
+        this.toastr = toastr;
         this.isOnline = true;
         this.hasNavBar = true;
         this.appVersion = packageJSON.version;
         this.rendererVersion = packageJSON.dependencies.formiojs.replace('^', '');
         // Initialize the authentication.
         this.auth.init();
-        this.auth.onLogin.subscribe(function () {
-            _this.router.navigate(["/" + _this.config.path]);
+        this.config.getPlan().then(function (plan) {
+            if (['team', 'commercial'].indexOf(plan) < 0) {
+                _this.toastr.warning('Limited Pro Version');
+                if (_this.auth.authenticated) {
+                    _this.auth.logout();
+                    _this.router.navigate(["/" + _this.config.path]);
+                }
+            }
+            else {
+                _this.offlineService.onlineChange.subscribe(function (online) {
+                    _this.isOnline = online;
+                    _this.ref.detectChanges();
+                });
+            }
+            _this.auth.onLogin.subscribe(function () {
+                if (['team', 'commercial'].indexOf(plan) < 0) {
+                    _this.auth.logout();
+                    _this.toastr.error('Limited Pro Version only Allow Anonymous Submissions, please contact support@form.io');
+                    localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].namespace + "Token");
+                    localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].namespace + "User");
+                    localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].namespace + "AppUser");
+                    window.location.reload();
+                }
+                else {
+                    _this.router.navigate(["/" + _this.config.path]);
+                }
+            });
+            _this.auth.onLogout.subscribe(function () {
+                _this.router.navigate(['/auth/login']);
+            });
+            // There isn't a navbar if the header is explicitely set to to false or iframe is set to true.
+            if (!_get(_this.config, 'query.header', true) ||
+                _get(_this.config, 'query.iframe', false)) {
+                _this.hasNavBar = false;
+            }
         });
-        this.auth.onLogout.subscribe(function () {
-            _this.router.navigate(['/auth/login']);
-        });
-        this.offlineService.onlineChange.subscribe(function (online) {
-            _this.isOnline = online;
-            _this.ref.detectChanges();
-        });
-        // There isn't a navbar if the header is explicitely set to to false or iframe is set to true.
-        if (!_get(this.config, 'query.header', true) ||
-            _get(this.config, 'query.iframe', false)) {
-            this.hasNavBar = false;
-        }
     }
     AppComponent.prototype.refreshApp = function () {
         this.config.reset();
         window.location.href = location.origin + "/#/";
         this.config.reload();
     };
+    AppComponent.prototype.goToSubmissions = function () {
+        if (['team', 'commercial'].indexOf(this.config.plan) < 0) {
+            this.toastr.error('Limited Pro Version only Allow Anonymous Submissions, please contact support@form.io');
+        }
+        else {
+            this.router.navigate(["/" + this.config.path + "/submission"]);
+        }
+    };
+    AppComponent.prototype.goToOffline = function () {
+        if (['team', 'commercial'].indexOf(this.config.plan) < 0) {
+            this.toastr.error('Limited Pro Version only Allow Anonymous Submissions, please contact support@form.io');
+        }
+        else {
+            this.router.navigate(["/" + this.config.path + "/offline"]);
+        }
+    };
+    AppComponent.prototype.goToForm = function () {
+        this.router.navigate(["/" + this.config.path]);
+    };
     AppComponent.prototype.ngAfterViewInit = function () {
         if (this.offline) {
             this.offlineService.offlinePlugin.statusIndicator(this.offline.nativeElement, true);
         }
     };
-    AppComponent.ctorParameters = function () { return [
-        { type: angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__["FormioAuthService"] },
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"] },
-        { type: _config__WEBPACK_IMPORTED_MODULE_4__["AppConfig"] },
-        { type: _offline_offline_service__WEBPACK_IMPORTED_MODULE_5__["OfflineService"] },
-        { type: _angular_core__WEBPACK_IMPORTED_MODULE_1__["ChangeDetectorRef"] }
-    ]; };
-    tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewChild"])('offline', { static: false }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"])
-    ], AppComponent.prototype, "offline", void 0);
-    AppComponent = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Component"])({
-            selector: 'app-root',
-            template: __webpack_require__(/*! raw-loader!./app.component.html */ "./node_modules/raw-loader/index.js!./src/app/app.component.html"),
-            styles: [__webpack_require__(/*! ./app.component.scss */ "./src/app/app.component.scss")]
-        }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [angular_formio_auth__WEBPACK_IMPORTED_MODULE_2__["FormioAuthService"],
-            _angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"],
-            _config__WEBPACK_IMPORTED_MODULE_4__["AppConfig"],
-            _offline_offline_service__WEBPACK_IMPORTED_MODULE_5__["OfflineService"],
-            _angular_core__WEBPACK_IMPORTED_MODULE_1__["ChangeDetectorRef"]])
-    ], AppComponent);
     return AppComponent;
 }());
+
+
+
+/***/ }),
+
+/***/ "./src/app/app.module.ngfactory.js":
+/*!*****************************************!*\
+  !*** ./src/app/app.module.ngfactory.js ***!
+  \*****************************************/
+/*! exports provided: AppModuleNgFactory */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppModuleNgFactory", function() { return AppModuleNgFactory; });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _app_module__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./app.module */ "./src/app/app.module.ts");
+/* harmony import */ var _app_component__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./app.component */ "./src/app/app.component.ts");
+/* harmony import */ var _node_modules_ngx_toastr_ngx_toastr_ngfactory__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../node_modules/ngx-toastr/ngx-toastr.ngfactory */ "./node_modules/ngx-toastr/ngx-toastr.ngfactory.js");
+/* harmony import */ var _node_modules_angular_router_router_ngfactory__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../node_modules/@angular/router/router.ngfactory */ "./node_modules/@angular/router/router.ngfactory.js");
+/* harmony import */ var _home_home_component_ngfactory__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./home/home.component.ngfactory */ "./src/app/home/home.component.ngfactory.js");
+/* harmony import */ var _form_form_component_ngfactory__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./form/form.component.ngfactory */ "./src/app/form/form.component.ngfactory.js");
+/* harmony import */ var _form_thanks_thanks_component_ngfactory__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./form/thanks/thanks.component.ngfactory */ "./src/app/form/thanks/thanks.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../node_modules/angular-formio/components/formio/formio.component.ngfactory */ "./node_modules/angular-formio/components/formio/formio.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_components_formbuilder_formbuilder_component_ngfactory__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../node_modules/angular-formio/components/formbuilder/formbuilder.component.ngfactory */ "./node_modules/angular-formio/components/formbuilder/formbuilder.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_form_FormGridHeader_component_ngfactory__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/form/FormGridHeader.component.ngfactory */ "./node_modules/angular-formio/grid/form/FormGridHeader.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_form_FormGridBody_component_ngfactory__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/form/FormGridBody.component.ngfactory */ "./node_modules/angular-formio/grid/form/FormGridBody.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_form_FormGridFooter_component_ngfactory__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/form/FormGridFooter.component.ngfactory */ "./node_modules/angular-formio/grid/form/FormGridFooter.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_submission_SubmissionGridHeader_component_ngfactory__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/submission/SubmissionGridHeader.component.ngfactory */ "./node_modules/angular-formio/grid/submission/SubmissionGridHeader.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_submission_SubmissionGridBody_component_ngfactory__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/submission/SubmissionGridBody.component.ngfactory */ "./node_modules/angular-formio/grid/submission/SubmissionGridBody.component.ngfactory.js");
+/* harmony import */ var _node_modules_angular_formio_grid_submission_SubmissionGridFooter_component_ngfactory__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../../node_modules/angular-formio/grid/submission/SubmissionGridFooter.component.ngfactory */ "./node_modules/angular-formio/grid/submission/SubmissionGridFooter.component.ngfactory.js");
+/* harmony import */ var _app_component_ngfactory__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./app.component.ngfactory */ "./src/app/app.component.ngfactory.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! @angular/platform-browser */ "./node_modules/@angular/platform-browser/fesm5/platform-browser.js");
+/* harmony import */ var _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! @angular/animations/browser */ "./node_modules/@angular/animations/fesm5/browser.js");
+/* harmony import */ var _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! @angular/platform-browser/animations */ "./node_modules/@angular/platform-browser/fesm5/animations.js");
+/* harmony import */ var _angular_animations__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! @angular/animations */ "./node_modules/@angular/animations/fesm5/animations.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! angular-formio/components/loader/formio.loader */ "./node_modules/angular-formio/components/loader/formio.loader.js");
+/* harmony import */ var angular_formio_components_alerts_formio_alerts__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! angular-formio/components/alerts/formio.alerts */ "./node_modules/angular-formio/components/alerts/formio.alerts.js");
+/* harmony import */ var angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! angular-formio/custom-component/custom-tags.service */ "./node_modules/angular-formio/custom-component/custom-tags.service.js");
+/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
+/* harmony import */ var ngx_bootstrap_pagination__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ngx-bootstrap/pagination */ "./node_modules/ngx-bootstrap/pagination/fesm5/ngx-bootstrap-pagination.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
+/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./offline/offline.service */ "./src/app/offline/offline.service.ts");
+/* harmony import */ var angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! angular-formio/auth/auth.service */ "./node_modules/angular-formio/auth/auth.service.js");
+/* harmony import */ var _AuthService__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./AuthService */ "./src/app/AuthService.ts");
+/* harmony import */ var angular_formio_auth_auth_config__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! angular-formio/auth/auth.config */ "./node_modules/angular-formio/auth/auth.config.js");
+/* harmony import */ var angular_formio_resource_resources_service__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! angular-formio/resource/resources.service */ "./node_modules/angular-formio/resource/resources.service.js");
+/* harmony import */ var angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! angular-formio/formio.config */ "./node_modules/angular-formio/formio.config.js");
+/* harmony import */ var _home_home_component__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./home/home.component */ "./src/app/home/home.component.ts");
+/* harmony import */ var _app_routing_module__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./app-routing.module */ "./src/app/app-routing.module.ts");
+/* harmony import */ var _form_form_component__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./form/form.component */ "./src/app/form/form.component.ts");
+/* harmony import */ var _form_thanks_thanks_component__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ./form/thanks/thanks.component */ "./src/app/form/thanks/thanks.component.ts");
+/* harmony import */ var angular_formio_formio_module__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! angular-formio/formio.module */ "./node_modules/angular-formio/formio.module.js");
+/* harmony import */ var angular_formio_grid_grid_module__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! angular-formio/grid/grid.module */ "./node_modules/angular-formio/grid/grid.module.js");
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var AppModuleNgFactory = _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵcmf"](_app_module__WEBPACK_IMPORTED_MODULE_1__["AppModule"], [_app_component__WEBPACK_IMPORTED_MODULE_2__["AppComponent"]], function (_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmod"]([_angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ComponentFactoryResolver"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵCodegenComponentFactoryResolver"], [[8, [_node_modules_ngx_toastr_ngx_toastr_ngfactory__WEBPACK_IMPORTED_MODULE_3__["ToastNgFactory"], _node_modules_angular_router_router_ngfactory__WEBPACK_IMPORTED_MODULE_4__["ɵangular_packages_router_router_lNgFactory"], _home_home_component_ngfactory__WEBPACK_IMPORTED_MODULE_5__["HomeComponentNgFactory"], _form_form_component_ngfactory__WEBPACK_IMPORTED_MODULE_6__["FormComponentNgFactory"], _form_thanks_thanks_component_ngfactory__WEBPACK_IMPORTED_MODULE_7__["ThanksComponentNgFactory"], _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_8__["FormioComponentNgFactory"], _node_modules_angular_formio_components_formbuilder_formbuilder_component_ngfactory__WEBPACK_IMPORTED_MODULE_9__["FormBuilderComponentNgFactory"], _node_modules_angular_formio_grid_form_FormGridHeader_component_ngfactory__WEBPACK_IMPORTED_MODULE_10__["FormGridHeaderComponentNgFactory"], _node_modules_angular_formio_grid_form_FormGridBody_component_ngfactory__WEBPACK_IMPORTED_MODULE_11__["FormGridBodyComponentNgFactory"], _node_modules_angular_formio_grid_form_FormGridFooter_component_ngfactory__WEBPACK_IMPORTED_MODULE_12__["FormGridFooterComponentNgFactory"], _node_modules_angular_formio_grid_submission_SubmissionGridHeader_component_ngfactory__WEBPACK_IMPORTED_MODULE_13__["SubmissionGridHeaderComponentNgFactory"], _node_modules_angular_formio_grid_submission_SubmissionGridBody_component_ngfactory__WEBPACK_IMPORTED_MODULE_14__["SubmissionGridBodyComponentNgFactory"], _node_modules_angular_formio_grid_submission_SubmissionGridFooter_component_ngfactory__WEBPACK_IMPORTED_MODULE_15__["SubmissionGridFooterComponentNgFactory"], _app_component_ngfactory__WEBPACK_IMPORTED_MODULE_16__["AppComponentNgFactory"]]], [3, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ComponentFactoryResolver"]], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgModuleRef"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["LOCALE_ID"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_r"], [[3, _angular_core__WEBPACK_IMPORTED_MODULE_0__["LOCALE_ID"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_common__WEBPACK_IMPORTED_MODULE_17__["NgLocalization"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["NgLocaleLocalization"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["LOCALE_ID"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_x"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_t"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["APP_ID"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_g"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["IterableDiffers"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_p"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["KeyValueDiffers"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_q"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["DomSanitizer"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomSanitizerImpl"], [_angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](6144, _angular_core__WEBPACK_IMPORTED_MODULE_0__["Sanitizer"], null, [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["DomSanitizer"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["HAMMER_GESTURE_CONFIG"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["HammerGestureConfig"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["EVENT_MANAGER_PLUGINS"], function (p0_0, p0_1, p0_2, p1_0, p2_0, p2_1, p2_2, p2_3) { return [new _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomEventsPlugin"](p0_0, p0_1, p0_2), new _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵKeyEventsPlugin"](p1_0), new _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵHammerGesturesPlugin"](p2_0, p2_1, p2_2, p2_3)]; }, [_angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["PLATFORM_ID"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["HAMMER_GESTURE_CONFIG"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵConsole"], [2, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["HAMMER_LOADER"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["EventManager"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["EventManager"], [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["EVENT_MANAGER_PLUGINS"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](135680, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomSharedStylesHost"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomSharedStylesHost"], [_angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomRendererFactory2"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomRendererFactory2"], [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["EventManager"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomSharedStylesHost"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["APP_ID"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["AnimationDriver"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ɵangular_packages_platform_browser_animations_animations_a"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["ɵAnimationStyleNormalizer"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ɵangular_packages_platform_browser_animations_animations_b"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["ɵAnimationEngine"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ɵInjectableAnimationEngine"], [_angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"], _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["AnimationDriver"], _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["ɵAnimationStyleNormalizer"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["RendererFactory2"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ɵangular_packages_platform_browser_animations_animations_c"], [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomRendererFactory2"], _angular_animations_browser__WEBPACK_IMPORTED_MODULE_19__["ɵAnimationEngine"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](6144, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵSharedStylesHost"], null, [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵDomSharedStylesHost"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_core__WEBPACK_IMPORTED_MODULE_0__["Testability"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Testability"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_animations__WEBPACK_IMPORTED_MODULE_21__["AnimationBuilder"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ɵBrowserAnimationBuilder"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["RendererFactory2"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["DOCUMENT"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ActivatedRoute"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_g"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadAllModules"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadAllModules"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](6144, _angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadingStrategy"], null, [_angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadAllModules"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](135680, _angular_router__WEBPACK_IMPORTED_MODULE_22__["RouterPreloader"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["RouterPreloader"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgModuleFactoryLoader"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Compiler"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Injector"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadingStrategy"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_router__WEBPACK_IMPORTED_MODULE_22__["NoPreloading"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["NoPreloading"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_o"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_c"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["ViewportScroller"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_CONFIGURATION"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_INITIALIZER"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_j"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_h"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](5120, _angular_core__WEBPACK_IMPORTED_MODULE_0__["APP_BOOTSTRAP_LISTENER"], function (p0_0) { return [p0_0]; }, [_angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_INITIALIZER"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_23__["FormioLoader"], angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_23__["FormioLoader"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_components_alerts_formio_alerts__WEBPACK_IMPORTED_MODULE_24__["FormioAlerts"], angular_formio_components_alerts_formio_alerts__WEBPACK_IMPORTED_MODULE_24__["FormioAlerts"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_25__["CustomTagsService"], angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_25__["CustomTagsService"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ɵangular_packages_forms_forms_n"], _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ɵangular_packages_forms_forms_n"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, ngx_bootstrap_pagination__WEBPACK_IMPORTED_MODULE_27__["PaginationConfig"], ngx_bootstrap_pagination__WEBPACK_IMPORTED_MODULE_27__["PaginationConfig"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _config__WEBPACK_IMPORTED_MODULE_28__["AppConfig"], _config__WEBPACK_IMPORTED_MODULE_28__["AppConfig"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"], ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["ToastrService"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["DomSanitizer"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, _offline_offline_service__WEBPACK_IMPORTED_MODULE_30__["OfflineService"], _offline_offline_service__WEBPACK_IMPORTED_MODULE_30__["OfflineService"], [_config__WEBPACK_IMPORTED_MODULE_28__["AppConfig"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationRef"], ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["ToastrService"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_31__["FormioAuthService"], _AuthService__WEBPACK_IMPORTED_MODULE_32__["AuthService"], [_config__WEBPACK_IMPORTED_MODULE_28__["AppConfig"], angular_formio_auth_auth_config__WEBPACK_IMPORTED_MODULE_33__["FormioAuthConfig"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_resource_resources_service__WEBPACK_IMPORTED_MODULE_34__["FormioResources"], angular_formio_resource_resources_service__WEBPACK_IMPORTED_MODULE_34__["FormioResources"], [angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_31__["FormioAuthService"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](4608, angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_35__["FormioAppConfig"], _config__WEBPACK_IMPORTED_MODULE_28__["AppConfig"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"], ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["ToastrService"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["DomSanitizer"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_common__WEBPACK_IMPORTED_MODULE_17__["CommonModule"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["CommonModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ErrorHandler"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵangular_packages_platform_browser_platform_browser_a"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgProbeToken"], function () { return [_angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_b"]()]; }, []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_h"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_h"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injector"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_core__WEBPACK_IMPORTED_MODULE_0__["APP_INITIALIZER"], function (p0_0, p1_0) { return [_angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["ɵangular_packages_platform_browser_platform_browser_m"](p0_0), _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_i"](p1_0)]; }, [[2, _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgProbeToken"]], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_h"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationInitStatus"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationInitStatus"], [[2, _angular_core__WEBPACK_IMPORTED_MODULE_0__["APP_INITIALIZER"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](131584, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationRef"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationRef"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵConsole"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Injector"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ErrorHandler"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ComponentFactoryResolver"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationInitStatus"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationModule"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationModule"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ApplicationRef"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["BrowserModule"], _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["BrowserModule"], [[3, _angular_platform_browser__WEBPACK_IMPORTED_MODULE_18__["BrowserModule"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["BrowserAnimationsModule"], _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["BrowserAnimationsModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["ToastrModule"], ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["ToastrModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_a"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_e"], [[3, _angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_router__WEBPACK_IMPORTED_MODULE_22__["UrlSerializer"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["DefaultUrlSerializer"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ChildrenOutletContexts"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ChildrenOutletContexts"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_CONFIGURATION"], { useHash: true, preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_22__["PreloadAllModules"] }, []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_common__WEBPACK_IMPORTED_MODULE_17__["LocationStrategy"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_d"], [_angular_common__WEBPACK_IMPORTED_MODULE_17__["PlatformLocation"], [2, _angular_common__WEBPACK_IMPORTED_MODULE_17__["APP_BASE_HREF"]], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_CONFIGURATION"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_common__WEBPACK_IMPORTED_MODULE_17__["Location"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["Location"], [_angular_common__WEBPACK_IMPORTED_MODULE_17__["LocationStrategy"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["PlatformLocation"]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_core__WEBPACK_IMPORTED_MODULE_0__["Compiler"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Compiler"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](512, _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgModuleFactoryLoader"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["SystemJsNgModuleLoader"], [_angular_core__WEBPACK_IMPORTED_MODULE_0__["Compiler"], [2, _angular_core__WEBPACK_IMPORTED_MODULE_0__["SystemJsNgModuleLoaderConfig"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTES"], function () { return [[{ path: "", component: _home_home_component__WEBPACK_IMPORTED_MODULE_36__["HomeComponent"] }, { path: "auth", loadChildren: _app_routing_module__WEBPACK_IMPORTED_MODULE_37__["ɵ0"] }, { path: ":project/:form", component: _form_form_component__WEBPACK_IMPORTED_MODULE_38__["FormComponent"] }, { path: ":project/:form/submission", loadChildren: _app_routing_module__WEBPACK_IMPORTED_MODULE_37__["ɵ1"] }, { path: ":project/:form/thanks", component: _form_thanks_thanks_component__WEBPACK_IMPORTED_MODULE_39__["ThanksComponent"] }, { path: ":project/:form/offline", loadChildren: _app_routing_module__WEBPACK_IMPORTED_MODULE_37__["ɵ2"] }]]; }, []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1024, _angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_f"], [_angular_router__WEBPACK_IMPORTED_MODULE_22__["UrlSerializer"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ChildrenOutletContexts"], _angular_common__WEBPACK_IMPORTED_MODULE_17__["Location"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Injector"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgModuleFactoryLoader"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Compiler"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTES"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["ROUTER_CONFIGURATION"], [2, _angular_router__WEBPACK_IMPORTED_MODULE_22__["UrlHandlingStrategy"]], [2, _angular_router__WEBPACK_IMPORTED_MODULE_22__["RouteReuseStrategy"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_router__WEBPACK_IMPORTED_MODULE_22__["RouterModule"], _angular_router__WEBPACK_IMPORTED_MODULE_22__["RouterModule"], [[2, _angular_router__WEBPACK_IMPORTED_MODULE_22__["ɵangular_packages_router_router_a"]], [2, _angular_router__WEBPACK_IMPORTED_MODULE_22__["Router"]]]), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _app_routing_module__WEBPACK_IMPORTED_MODULE_37__["AppRoutingModule"], _app_routing_module__WEBPACK_IMPORTED_MODULE_37__["AppRoutingModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, angular_formio_formio_module__WEBPACK_IMPORTED_MODULE_40__["FormioModule"], angular_formio_formio_module__WEBPACK_IMPORTED_MODULE_40__["FormioModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ɵangular_packages_forms_forms_d"], _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ɵangular_packages_forms_forms_d"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _angular_forms__WEBPACK_IMPORTED_MODULE_26__["FormsModule"], _angular_forms__WEBPACK_IMPORTED_MODULE_26__["FormsModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, ngx_bootstrap_pagination__WEBPACK_IMPORTED_MODULE_27__["PaginationModule"], ngx_bootstrap_pagination__WEBPACK_IMPORTED_MODULE_27__["PaginationModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, angular_formio_grid_grid_module__WEBPACK_IMPORTED_MODULE_41__["FormioGrid"], angular_formio_grid_grid_module__WEBPACK_IMPORTED_MODULE_41__["FormioGrid"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](1073742336, _app_module__WEBPACK_IMPORTED_MODULE_1__["AppModule"], _app_module__WEBPACK_IMPORTED_MODULE_1__["AppModule"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, _angular_core__WEBPACK_IMPORTED_MODULE_0__["DEFAULT_CURRENCY_CODE"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵangular_packages_core_core_u"], []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵINJECTOR_SCOPE"], "root", []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_20__["ANIMATION_MODULE_TYPE"], "BrowserAnimations", []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["TOAST_CONFIG"], { default: ngx_toastr__WEBPACK_IMPORTED_MODULE_29__["DefaultGlobalConfig"], config: {} }, []), _angular_core__WEBPACK_IMPORTED_MODULE_0__["ɵmpd"](256, angular_formio_auth_auth_config__WEBPACK_IMPORTED_MODULE_33__["FormioAuthConfig"], _app_module__WEBPACK_IMPORTED_MODULE_1__["ɵ0"], [])]); });
 
 
 
@@ -5580,91 +6577,34 @@ var AppComponent = /** @class */ (function () {
 /*!*******************************!*\
   !*** ./src/app/app.module.ts ***!
   \*******************************/
-/*! exports provided: AppModule */
+/*! exports provided: AppModule, ɵ0 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppModule", function() { return AppModule; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/platform-browser */ "./node_modules/@angular/platform-browser/fesm5/platform-browser.js");
-/* harmony import */ var _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/platform-browser/animations */ "./node_modules/@angular/platform-browser/fesm5/animations.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
-/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
-/* harmony import */ var angular_formio_grid__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! angular-formio/grid */ "./node_modules/angular-formio/grid/index.js");
-/* harmony import */ var angular_formio_resource__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! angular-formio/resource */ "./node_modules/angular-formio/resource/index.js");
-/* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
-/* harmony import */ var _app_routing_module__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./app-routing.module */ "./src/app/app-routing.module.ts");
-/* harmony import */ var _app_component__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./app.component */ "./src/app/app.component.ts");
-/* harmony import */ var _form_form_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./form/form.component */ "./src/app/form/form.component.ts");
-/* harmony import */ var _AuthService__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./AuthService */ "./src/app/AuthService.ts");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./config */ "./src/app/config.ts");
-/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./offline/offline.service */ "./src/app/offline/offline.service.ts");
-/* harmony import */ var _home_home_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./home/home.component */ "./src/app/home/home.component.ts");
-/* harmony import */ var jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! jquery/dist/jquery.slim */ "./node_modules/jquery/dist/jquery.slim.js");
-/* harmony import */ var jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_16___default = /*#__PURE__*/__webpack_require__.n(jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_16__);
-/* harmony import */ var bootstrap__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! bootstrap */ "./node_modules/bootstrap/dist/js/bootstrap.js");
-/* harmony import */ var bootstrap__WEBPACK_IMPORTED_MODULE_17___default = /*#__PURE__*/__webpack_require__.n(bootstrap__WEBPACK_IMPORTED_MODULE_17__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ɵ0", function() { return ɵ0; });
+/* harmony import */ var jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! jquery/dist/jquery.slim */ "./node_modules/jquery/dist/jquery.slim.js");
+/* harmony import */ var jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(jquery_dist_jquery_slim__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var bootstrap__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! bootstrap */ "./node_modules/bootstrap/dist/js/bootstrap.js");
+/* harmony import */ var bootstrap__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(bootstrap__WEBPACK_IMPORTED_MODULE_1__);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+var ɵ0 = {
+    delayAuth: true,
+    login: {
+        form: 'user/login'
+    }
+};
 // Enable once we resolve the problem with ServiceWorkers and offline mode.
 // import { ServiceWorkerModule } from '@angular/service-worker';
 // import { environment } from '../environments/environment';
 var AppModule = /** @class */ (function () {
     function AppModule() {
     }
-    AppModule = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_3__["NgModule"])({
-            declarations: [
-                _app_component__WEBPACK_IMPORTED_MODULE_10__["AppComponent"],
-                _form_form_component__WEBPACK_IMPORTED_MODULE_11__["FormComponent"],
-                _home_home_component__WEBPACK_IMPORTED_MODULE_15__["HomeComponent"]
-            ],
-            imports: [
-                _angular_platform_browser__WEBPACK_IMPORTED_MODULE_1__["BrowserModule"],
-                _angular_platform_browser_animations__WEBPACK_IMPORTED_MODULE_2__["BrowserAnimationsModule"],
-                /* TODO: Need to figure out why the service workers conflict with offline mode. */
-                /* ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production }), */
-                ngx_toastr__WEBPACK_IMPORTED_MODULE_4__["ToastrModule"].forRoot(),
-                _app_routing_module__WEBPACK_IMPORTED_MODULE_9__["AppRoutingModule"],
-                angular_formio__WEBPACK_IMPORTED_MODULE_5__["FormioModule"],
-                angular_formio_grid__WEBPACK_IMPORTED_MODULE_6__["FormioGrid"]
-            ],
-            providers: [
-                _config__WEBPACK_IMPORTED_MODULE_13__["AppConfig"],
-                _offline_offline_service__WEBPACK_IMPORTED_MODULE_14__["OfflineService"],
-                angular_formio_resource__WEBPACK_IMPORTED_MODULE_7__["FormioResources"],
-                { provide: angular_formio_auth__WEBPACK_IMPORTED_MODULE_8__["FormioAuthService"], useClass: _AuthService__WEBPACK_IMPORTED_MODULE_12__["AuthService"] },
-                { provide: angular_formio__WEBPACK_IMPORTED_MODULE_5__["FormioAppConfig"], useClass: _config__WEBPACK_IMPORTED_MODULE_13__["AppConfig"] },
-                { provide: angular_formio_auth__WEBPACK_IMPORTED_MODULE_8__["FormioAuthConfig"], useValue: {
-                        delayAuth: true,
-                        login: {
-                            form: 'user/login'
-                        }
-                    } }
-            ],
-            bootstrap: [_app_component__WEBPACK_IMPORTED_MODULE_10__["AppComponent"]]
-        })
-    ], AppModule);
     return AppModule;
 }());
+
 
 
 
@@ -5680,19 +6620,17 @@ var AppModule = /** @class */ (function () {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AppConfig", function() { return AppConfig; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
-/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
-/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
-/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
-/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(lodash_get__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony import */ var lodash_each__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! lodash/each */ "./node_modules/lodash/each.js");
-/* harmony import */ var lodash_each__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(lodash_each__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony import */ var lodash_trim__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! lodash/trim */ "./node_modules/lodash/trim.js");
-/* harmony import */ var lodash_trim__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(lodash_trim__WEBPACK_IMPORTED_MODULE_7__);
-/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @angular/platform-browser */ "./node_modules/@angular/platform-browser/fesm5/platform-browser.js");
-
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
+/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
+/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
+/* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(lodash_get__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var lodash_each__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! lodash/each */ "./node_modules/lodash/each.js");
+/* harmony import */ var lodash_each__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(lodash_each__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var lodash_trim__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! lodash/trim */ "./node_modules/lodash/trim.js");
+/* harmony import */ var lodash_trim__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(lodash_trim__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/platform-browser */ "./node_modules/@angular/platform-browser/fesm5/platform-browser.js");
 
 
 
@@ -5702,7 +6640,7 @@ __webpack_require__.r(__webpack_exports__);
 
 __webpack_require__(/*! seamless/build/seamless.child.js */ "./node_modules/seamless/build/seamless.child.js");
 
-var query = angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].pageQuery();
+var query = angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].pageQuery();
 // Default all of our boolean properties.
 [
     { name: 'iframe', default: false },
@@ -5726,13 +6664,13 @@ var AppConfig = /** @class */ (function () {
         this.allowSwitch = window.ALLOW_SWITCH || true;
         this.navbar = window.APP_NAVBAR || 'navbar-light bg-light';
         this.branding = (window.APP_BRANDING !== false);
-        this.form = new _angular_core__WEBPACK_IMPORTED_MODULE_1__["EventEmitter"]();
+        this.form = new _angular_core__WEBPACK_IMPORTED_MODULE_0__["EventEmitter"]();
         this.needsRefresh = false;
-        this.title = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Title");
-        this.formName = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormName");
-        this.formPath = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormPath");
-        this.appJS = this.sanitizer.bypassSecurityTrustResourceUrl(AppConfig_1.appJS);
-        this.appCSS = this.sanitizer.bypassSecurityTrustResourceUrl(AppConfig_1.appCSS);
+        this.title = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Title");
+        this.formName = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormName");
+        this.formPath = localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormPath");
+        this.appJS = this.sanitizer.bypassSecurityTrustResourceUrl(AppConfig.appJS);
+        this.appCSS = this.sanitizer.bypassSecurityTrustResourceUrl(AppConfig.appCSS);
         if (window.APP_LOGO) {
             this.appLogo = this.sanitizer.bypassSecurityTrustResourceUrl(window.APP_LOGO);
         }
@@ -5743,7 +6681,7 @@ var AppConfig = /** @class */ (function () {
         if (query.branding === false) {
             this.branding = false;
         }
-        fetch(AppConfig_1.appUrl + "/config.json")
+        fetch(AppConfig.appUrl + "/config.json")
             .then(function (response) { return response.json(); })
             .then(function (projectConfig) {
             if (projectConfig.config) {
@@ -5755,6 +6693,9 @@ var AppConfig = /** @class */ (function () {
                 }
                 if (projectConfig.config.hasOwnProperty('branding')) {
                     _this.branding = projectConfig.config.branding;
+                }
+                if (projectConfig.config.hasOwnProperty('message')) {
+                    _this.message = projectConfig.config.message;
                 }
                 if (projectConfig.config.js) {
                     var script = document.createElement('script');
@@ -5770,90 +6711,90 @@ var AppConfig = /** @class */ (function () {
                 }
             }
         });
-        this.path = AppConfig_1.path;
-        this.src = AppConfig_1.src;
-        this.project = AppConfig_1.appUrl;
+        this.path = AppConfig.path;
+        this.src = AppConfig.src;
+        this.project = AppConfig.appUrl;
         this.query = query;
-        this.parent = AppConfig_1.parent;
+        this.parent = AppConfig.parent;
+        this.getPlan();
     }
-    AppConfig_1 = AppConfig;
     AppConfig.initialize = function (config) {
         // Connect to the iframe parent (if applicable).
-        AppConfig_1.parent = window.seamless.connect({
+        AppConfig.parent = window.seamless.connect({
             container: 'div.main'
         });
         // Add custom css file if applicable.
         if (query.css) {
-            AppConfig_1.appCSS = decodeURIComponent(query.css);
+            AppConfig.appCSS = decodeURIComponent(query.css);
         }
         // Add custom js file if applicable.
         if (query.js) {
-            AppConfig_1.appJS = decodeURIComponent(query.js);
+            AppConfig.appJS = decodeURIComponent(query.js);
         }
         var protocol;
         var host;
         var parser;
-        AppConfig_1.path = localStorage.getItem('currentPath');
-        AppConfig_1.src = localStorage.getItem('formioSrc');
-        AppConfig_1.apiUrl = localStorage.getItem('formioBase') || 'https://api.form.io';
-        AppConfig_1.appUrl = localStorage.getItem('formioProject') || AppConfig_1.apiUrl;
+        AppConfig.path = localStorage.getItem('currentPath');
+        AppConfig.src = localStorage.getItem('formioSrc');
+        AppConfig.apiUrl = localStorage.getItem('formioBase') || 'https://api.form.io';
+        AppConfig.appUrl = localStorage.getItem('formioProject') || AppConfig.apiUrl;
         if (query.src) {
-            AppConfig_1.src = query.src;
+            AppConfig.src = query.src;
             parser = document.createElement('a');
             parser.href = query.src;
             protocol = parser.protocol.replace(':', '');
             host = parser.host;
-            AppConfig_1.apiUrl = protocol + '://' + host;
+            AppConfig.apiUrl = protocol + '://' + host;
             var hostParts = host.split('.');
-            var pathParts = lodash_trim__WEBPACK_IMPORTED_MODULE_7___default()(parser.pathname, '/').split('/');
-            AppConfig_1.formPath = pathParts.pop();
-            AppConfig_1.appUrl = pathParts.length ? AppConfig_1.apiUrl + "/" + pathParts.join('/') : AppConfig_1.apiUrl;
-            AppConfig_1.projectName = pathParts.length ? pathParts.pop() : hostParts[0];
-            AppConfig_1.path = AppConfig_1.projectName + "/" + AppConfig_1.formPath;
-            localStorage.setItem('formioSrc', AppConfig_1.src);
-            localStorage.setItem('currentPath', AppConfig_1.path);
+            var pathParts = lodash_trim__WEBPACK_IMPORTED_MODULE_6___default()(parser.pathname, '/').split('/');
+            AppConfig.formPath = pathParts.pop();
+            AppConfig.appUrl = pathParts.length ? AppConfig.apiUrl + "/" + pathParts.join('/') : AppConfig.apiUrl;
+            AppConfig.projectName = pathParts.length ? pathParts.pop() : hostParts[0];
+            AppConfig.path = AppConfig.projectName + "/" + AppConfig.formPath;
+            localStorage.setItem('formioSrc', AppConfig.src);
+            localStorage.setItem('currentPath', AppConfig.path);
         }
         else if (query.paths.length > 1 && query.paths[0] !== 'auth') {
             if (window.PROJECT_URL) {
-                AppConfig_1.appUrl = window.PROJECT_URL;
-                AppConfig_1.projectName = query.paths[0];
-                AppConfig_1.formPath = query.paths[1];
+                AppConfig.appUrl = window.PROJECT_URL;
+                AppConfig.projectName = query.paths[0];
+                AppConfig.formPath = query.paths[1];
                 parser = document.createElement('a');
-                parser.href = AppConfig_1.appUrl;
+                parser.href = AppConfig.appUrl;
                 protocol = parser.protocol.replace(':', '');
                 host = parser.host;
-                AppConfig_1.apiUrl = protocol + '://' + host;
-                AppConfig_1.src = AppConfig_1.appUrl + "/" + AppConfig_1.formPath;
-                AppConfig_1.path = AppConfig_1.projectName + "/" + AppConfig_1.formPath;
-                localStorage.setItem('formioSrc', AppConfig_1.src);
-                localStorage.setItem('currentPath', AppConfig_1.path);
+                AppConfig.apiUrl = protocol + '://' + host;
+                AppConfig.src = AppConfig.appUrl + "/" + AppConfig.formPath;
+                AppConfig.path = AppConfig.projectName + "/" + AppConfig.formPath;
+                localStorage.setItem('formioSrc', AppConfig.src);
+                localStorage.setItem('currentPath', AppConfig.path);
             }
             else {
-                AppConfig_1.projectName = query.paths[0];
-                AppConfig_1.formPath = query.paths[1];
-                if (AppConfig_1.appUrl === AppConfig_1.apiUrl) {
-                    AppConfig_1.appUrl = "https://" + AppConfig_1.projectName + ".form.io";
+                AppConfig.projectName = query.paths[0];
+                AppConfig.formPath = query.paths[1];
+                if (AppConfig.appUrl === AppConfig.apiUrl) {
+                    AppConfig.appUrl = "https://" + AppConfig.projectName + ".form.io";
                 }
-                AppConfig_1.src = AppConfig_1.appUrl + "/" + AppConfig_1.formPath;
-                AppConfig_1.path = AppConfig_1.projectName + "/" + AppConfig_1.formPath;
-                localStorage.setItem('formioSrc', AppConfig_1.src);
-                localStorage.setItem('currentPath', AppConfig_1.path);
+                AppConfig.src = AppConfig.appUrl + "/" + AppConfig.formPath;
+                AppConfig.path = AppConfig.projectName + "/" + AppConfig.formPath;
+                localStorage.setItem('formioSrc', AppConfig.src);
+                localStorage.setItem('currentPath', AppConfig.path);
             }
         }
-        localStorage.setItem('formioBase', AppConfig_1.apiUrl);
-        localStorage.setItem('formioProject', AppConfig_1.appUrl);
+        localStorage.setItem('formioBase', AppConfig.apiUrl);
+        localStorage.setItem('formioProject', AppConfig.appUrl);
         // Namespace this viewer based on the project currently being viewed.
-        angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace = "viewer-" + btoa(AppConfig_1.appUrl).replace('/', '-').replace('+', '_').replace('=', '');
-        angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].setBaseUrl(AppConfig_1.apiUrl);
-        angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].setProjectUrl(AppConfig_1.appUrl);
+        angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace = "viewer-" + btoa(AppConfig.appUrl).replace('/', '-').replace('+', '_').replace('=', '');
+        angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].setBaseUrl(AppConfig.apiUrl);
+        angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].setProjectUrl(AppConfig.appUrl);
         if (query.token) {
-            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Token", query.token);
-            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "AppUser");
-            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "User");
+            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Token", query.token);
+            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "AppUser");
+            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "User");
         }
         // Add bootswatch theme.
-        var currentTheme = query.theme || localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Theme") || 'cosmo';
-        localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Theme", currentTheme);
+        var currentTheme = query.theme || localStorage.getItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Theme") || 'cosmo';
+        localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Theme", currentTheme);
         var styles = "assets/lib/bootswatch/dist/" + currentTheme + "/bootstrap.min.css";
         var link = document.createElement('link');
         link.setAttribute('rel', 'stylesheet');
@@ -5861,20 +6802,20 @@ var AppConfig = /** @class */ (function () {
         document.getElementsByTagName('head')[0].appendChild(link);
         // Set the correct properties on the AppConfig instance.
         if (config) {
-            config.path = AppConfig_1.path;
-            config.project = AppConfig_1.appUrl;
-            config.src = AppConfig_1.src;
+            config.path = AppConfig.path;
+            config.project = AppConfig.appUrl;
+            config.src = AppConfig.src;
         }
         if ((window.APP_SSO && query.saml) || query.sso) {
-            angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].authUrl = window.SSO_PROJECT;
-            AppConfig_1.ready = angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].ssoInit(window.APP_SSO || query.sso || 'saml', {
+            angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].authUrl = window.SSO_PROJECT;
+            AppConfig.ready = angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].ssoInit(window.APP_SSO || query.sso || 'saml', {
                 forceAuth: true
             }) || (new Promise(function () { }));
         }
         else {
-            AppConfig_1.ready = Promise.resolve();
+            AppConfig.ready = Promise.resolve();
         }
-        return AppConfig_1.src;
+        return AppConfig.src;
     };
     AppConfig.prototype.reload = function (event) {
         if (event) {
@@ -5887,12 +6828,12 @@ var AppConfig = /** @class */ (function () {
             submission.metadata = {};
         }
         submission.metadata.appUrl = location.href;
-        angular_formio__WEBPACK_IMPORTED_MODULE_4__["FormioUtils"].eachComponent(this.currentForm.components, function (component, path) {
+        angular_formio__WEBPACK_IMPORTED_MODULE_3__["FormioUtils"].eachComponent(this.currentForm.components, function (component, path) {
             if (component &&
                 component.type === 'button' &&
                 component.properties &&
-                lodash_get__WEBPACK_IMPORTED_MODULE_5___default()(submission.data, path, false)) {
-                lodash_each__WEBPACK_IMPORTED_MODULE_6___default()(component.properties, function (prop, key) {
+                lodash_get__WEBPACK_IMPORTED_MODULE_4___default()(submission.data, path, false)) {
+                lodash_each__WEBPACK_IMPORTED_MODULE_5___default()(component.properties, function (prop, key) {
                     if (key.substring(0, 6) === 'data__') {
                         submission.data[key.substring(6)] = prop;
                     }
@@ -5903,19 +6844,19 @@ var AppConfig = /** @class */ (function () {
     };
     AppConfig.prototype.loadForm = function (noSubmitCheck, route) {
         var _this = this;
-        var src = AppConfig_1.src;
-        if (AppConfig_1.initialize(this) !== src) {
+        var src = AppConfig.src;
+        if (AppConfig.initialize(this) !== src) {
             // If the form changes, then logout and refresh.
-            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Token");
-            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "AppUser");
-            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "User");
+            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Token");
+            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "AppUser");
+            localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "User");
             window.location.reload();
             return;
         }
-        this.submissions = AppConfig_1.src + "/submission";
-        this.formio = new angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"](AppConfig_1.src);
+        this.submissions = AppConfig.src + "/submission";
+        this.formio = new angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"](AppConfig.src);
         var currentForm = null;
-        return AppConfig_1.ready
+        return AppConfig.ready
             .then(function () { return _this.formio.loadForm(null, {
             noToken: true
         }); })
@@ -5924,13 +6865,13 @@ var AppConfig = /** @class */ (function () {
             _this.title = formObj.title;
             _this.formName = formObj.name;
             _this.formPath = formObj.path;
-            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Title", _this.title);
-            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormName", _this.formName);
-            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormPath", _this.formPath);
+            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Title", _this.title);
+            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormName", _this.formName);
+            localStorage.setItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormPath", _this.formPath);
             return _this.formio.userPermissions(undefined, formObj).then(function (perms) {
                 if (!noSubmitCheck && !perms.create) {
                     if (!perms.user._id || (perms.user._id && !perms.read)) {
-                        angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].setUser(null);
+                        angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].setUser(null);
                         _this.toastr.error('You do not have access to submit this form. Please login with a different account.');
                         _this.router.navigate(['/auth/login']);
                     }
@@ -5960,7 +6901,7 @@ var AppConfig = /** @class */ (function () {
                         { prop: 'disabled', key: 'userDisable', value: true },
                         { prop: 'disabled', key: 'userEnable', value: false }
                     ];
-                    angular_formio__WEBPACK_IMPORTED_MODULE_4__["FormioUtils"].eachComponent(formObj.components, function (component) {
+                    angular_formio__WEBPACK_IMPORTED_MODULE_3__["FormioUtils"].eachComponent(formObj.components, function (component) {
                         if (component.properties) {
                             props_1.forEach(function (prop) {
                                 if (component.properties[prop.key]) {
@@ -5968,7 +6909,7 @@ var AppConfig = /** @class */ (function () {
                                     var roles = component.properties[prop.key].split(',');
                                     for (var _i = 0, roles_1 = roles; _i < roles_1.length; _i++) {
                                         var role = roles_1[_i];
-                                        if (userRoles_1.indexOf(lodash_trim__WEBPACK_IMPORTED_MODULE_7___default()(role)) !== -1) {
+                                        if (userRoles_1.indexOf(lodash_trim__WEBPACK_IMPORTED_MODULE_6___default()(role)) !== -1) {
                                             component[prop.prop] = prop.value;
                                             break;
                                         }
@@ -5984,7 +6925,7 @@ var AppConfig = /** @class */ (function () {
             });
         }).catch(function (err) {
             if (err === 'Unauthorized' && !err.networkError) {
-                var currentUser = angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].getUser();
+                var currentUser = angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].getUser();
                 if (!currentUser) {
                     _this.router.navigate(['/auth/login']);
                 }
@@ -6009,43 +6950,39 @@ var AppConfig = /** @class */ (function () {
         localStorage.removeItem('formioProject');
         localStorage.removeItem('currentPath');
         // Remove namespaced app items.
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Title");
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormName");
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "FormPath");
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Theme");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Title");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormName");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "FormPath");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Theme");
         // Remove namespaced Formio items.
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "Token");
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "User");
-        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_4__["Formio"].namespace + "AppUser");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "Token");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "User");
+        localStorage.removeItem(angular_formio__WEBPACK_IMPORTED_MODULE_3__["Formio"].namespace + "AppUser");
+    };
+    AppConfig.prototype.getPlan = function () {
+        var _this = this;
+        this.plan = 'commercial';
+        return new Promise(function (resolve, reject) {
+            // We will temporarily resolve commercial always here until we have the official licensing in place.
+            return resolve(_this.plan);
+        });
     };
     Object.defineProperty(AppConfig.prototype, "appUrl", {
         get: function () {
-            return AppConfig_1.appUrl;
+            return AppConfig.appUrl;
         },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(AppConfig.prototype, "apiUrl", {
         get: function () {
-            return AppConfig_1.apiUrl;
+            return AppConfig.apiUrl;
         },
         enumerable: true,
         configurable: true
     });
-    var AppConfig_1;
     AppConfig.appJS = window.APP_JS || '';
     AppConfig.appCSS = window.APP_CSS || '';
-    AppConfig.ctorParameters = function () { return [
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"] },
-        { type: ngx_toastr__WEBPACK_IMPORTED_MODULE_3__["ToastrService"] },
-        { type: _angular_platform_browser__WEBPACK_IMPORTED_MODULE_8__["DomSanitizer"] }
-    ]; };
-    AppConfig = AppConfig_1 = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Injectable"])(),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"],
-            ngx_toastr__WEBPACK_IMPORTED_MODULE_3__["ToastrService"],
-            _angular_platform_browser__WEBPACK_IMPORTED_MODULE_8__["DomSanitizer"]])
-    ], AppConfig);
     return AppConfig;
 }());
 
@@ -6055,14 +6992,93 @@ AppConfig.initialize();
 
 /***/ }),
 
-/***/ "./src/app/form/form.component.scss":
-/*!******************************************!*\
-  !*** ./src/app/form/form.component.scss ***!
-  \******************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ "./src/app/form/form.component.ngfactory.js":
+/*!**************************************************!*\
+  !*** ./src/app/form/form.component.ngfactory.js ***!
+  \**************************************************/
+/*! exports provided: RenderType_FormComponent, View_FormComponent_0, View_FormComponent_Host_0, FormComponentNgFactory */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
 
-module.exports = "\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsImZpbGUiOiJzcmMvYXBwL2Zvcm0vZm9ybS5jb21wb25lbnQuc2NzcyJ9 */"
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RenderType_FormComponent", function() { return RenderType_FormComponent; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_FormComponent_0", function() { return View_FormComponent_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_FormComponent_Host_0", function() { return View_FormComponent_Host_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FormComponentNgFactory", function() { return FormComponentNgFactory; });
+/* harmony import */ var _form_component_scss_ngstyle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./form.component.scss.ngstyle */ "./src/app/form/form.component.scss.ngstyle.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/angular-formio/components/formio/formio.component.ngfactory */ "./node_modules/angular-formio/components/formio/formio.component.ngfactory.js");
+/* harmony import */ var angular_formio_components_formio_formio_component__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! angular-formio/components/formio/formio.component */ "./node_modules/angular-formio/components/formio/formio.component.js");
+/* harmony import */ var angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! angular-formio/components/loader/formio.loader */ "./node_modules/angular-formio/components/loader/formio.loader.js");
+/* harmony import */ var angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! angular-formio/formio.config */ "./node_modules/angular-formio/formio.config.js");
+/* harmony import */ var angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! angular-formio/custom-component/custom-tags.service */ "./node_modules/angular-formio/custom-component/custom-tags.service.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _form_component__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./form.component */ "./src/app/form/form.component.ts");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
+/* harmony import */ var angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! angular-formio/auth/auth.service */ "./node_modules/angular-formio/auth/auth.service.js");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
+/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../offline/offline.service */ "./src/app/offline/offline.service.ts");
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var styles_FormComponent = [_form_component_scss_ngstyle__WEBPACK_IMPORTED_MODULE_0__["styles"]];
+var RenderType_FormComponent = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵcrt"]({ encapsulation: 2, styles: styles_FormComponent, data: {} });
+
+function View_FormComponent_1(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 0, "div", [["class", "loader"]], null, null, null, null, null))], null, null); }
+function View_FormComponent_2(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 2, "div", [["class", "card bg-light"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 1, "div", [["class", "card-body"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["You cannot submit this form. Please log in as a different user."]))], null, null); }
+function View_FormComponent_3(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "div", [["class", "alert alert-success"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Submission Complete!\n"]))], null, null); }
+function View_FormComponent_4(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "formio", [], null, [[null, "change"], [null, "submit"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("change" === en)) {
+        var pd_0 = (_co.onChange($event) !== false);
+        ad = (pd_0 && ad);
+    } if (("submit" === en)) {
+        var pd_1 = (_co.onSubmit($event) !== false);
+        ad = (pd_1 && ad);
+    } return ad; }, _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__["View_FormioComponent_0"], _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__["RenderType_FormioComponent"])), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 770048, null, 0, angular_formio_components_formio_formio_component__WEBPACK_IMPORTED_MODULE_3__["FormioComponent"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["NgZone"], angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_4__["FormioLoader"], [2, angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_5__["FormioAppConfig"]], [2, angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_6__["CustomTagsService"]]], { form: [0, "form"], submission: [1, "submission"], error: [2, "error"], success: [3, "success"] }, { submit: "submit", change: "change" })], function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.config.currentForm; var currVal_1 = _co.submission; var currVal_2 = _co.error; var currVal_3 = _co.success; _ck(_v, 1, 0, currVal_0, currVal_1, currVal_2, currVal_3); }, null); }
+function View_FormComponent_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_FormComponent_1)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_FormComponent_2)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](3, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_FormComponent_3)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](5, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_FormComponent_4)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](7, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null)], function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.formLoading; _ck(_v, 1, 0, currVal_0); var currVal_1 = (!_co.formLoading && !_co.canSubmit); _ck(_v, 3, 0, currVal_1); var currVal_2 = (!_co.formLoading && _co.submissionComplete); _ck(_v, 5, 0, currVal_2); var currVal_3 = (_co.canSubmit && !_co.submissionComplete); _ck(_v, 7, 0, currVal_3); }, null); }
+function View_FormComponent_Host_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "app-form", [], null, null, null, View_FormComponent_0, RenderType_FormComponent)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 4308992, null, 0, _form_component__WEBPACK_IMPORTED_MODULE_8__["FormComponent"], [_angular_router__WEBPACK_IMPORTED_MODULE_9__["ActivatedRoute"], _angular_router__WEBPACK_IMPORTED_MODULE_9__["Router"], _config__WEBPACK_IMPORTED_MODULE_10__["AppConfig"], angular_formio_auth_auth_service__WEBPACK_IMPORTED_MODULE_11__["FormioAuthService"], ngx_toastr__WEBPACK_IMPORTED_MODULE_12__["ToastrService"], _offline_offline_service__WEBPACK_IMPORTED_MODULE_13__["OfflineService"]], null, null)], function (_ck, _v) { _ck(_v, 1, 0); }, null); }
+var FormComponentNgFactory = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵccf"]("app-form", _form_component__WEBPACK_IMPORTED_MODULE_8__["FormComponent"], View_FormComponent_Host_0, {}, {}, []);
+
+
+
+/***/ }),
+
+/***/ "./src/app/form/form.component.scss.ngstyle.js":
+/*!*****************************************************!*\
+  !*** ./src/app/form/form.component.scss.ngstyle.js ***!
+  \*****************************************************/
+/*! exports provided: styles */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "styles", function() { return styles; });
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+var styles = ["\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsImZpbGUiOiJzcmMvYXBwL2Zvcm0vZm9ybS5jb21wb25lbnQuc2NzcyJ9 */"];
+
+
 
 /***/ }),
 
@@ -6076,15 +7092,17 @@ module.exports = "\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FormComponent", function() { return FormComponent; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
 /* harmony import */ var angular_formio_auth__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! angular-formio/auth */ "./node_modules/angular-formio/auth/index.js");
 /* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
 /* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! lodash/get */ "./node_modules/lodash/get.js");
 /* harmony import */ var lodash_get__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(lodash_get__WEBPACK_IMPORTED_MODULE_5__);
 /* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
-/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../offline/offline.service */ "./src/app/offline/offline.service.ts");
+/* harmony import */ var _formio_premium__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @formio/premium */ "./node_modules/@formio/premium/lib/index.js");
+/* harmony import */ var _offline_offline_service__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../offline/offline.service */ "./src/app/offline/offline.service.ts");
+
 
 
 
@@ -6105,8 +7123,16 @@ var FormComponent = /** @class */ (function () {
         this.canSubmit = false;
         this.formLoading = true;
         this.submissionComplete = false;
-        this.error = new _angular_core__WEBPACK_IMPORTED_MODULE_1__["EventEmitter"]();
-        this.success = new _angular_core__WEBPACK_IMPORTED_MODULE_1__["EventEmitter"]();
+        this.error = new _angular_core__WEBPACK_IMPORTED_MODULE_0__["EventEmitter"]();
+        this.success = new _angular_core__WEBPACK_IMPORTED_MODULE_0__["EventEmitter"]();
+        this.config.getPlan().then(function (plan) {
+            if (['team', 'commercial'].indexOf(plan) < 0) {
+                console.log('isBasic');
+            }
+            else {
+                angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].use(_formio_premium__WEBPACK_IMPORTED_MODULE_7__["default"]);
+            }
+        });
     }
     FormComponent.prototype.ngOnInit = function () {
         var _this = this;
@@ -6152,7 +7178,15 @@ var FormComponent = /** @class */ (function () {
                 }
             }
             else if (_this.auth.authenticated) {
-                _this.router.navigate(["submission/" + saved._id], { relativeTo: _this.route });
+                _this.config.getPlan().then(function (plan) {
+                    if (['team', 'commercial'].indexOf(plan) < 0) {
+                        _this.toastr.warning('Limited Pro Version only Allow Anonymous Submissions, please contact support@form.io');
+                        _this.router.navigate(["/" + _this.config.path]);
+                    }
+                    else {
+                        _this.router.navigate(["submission/" + saved._id], { relativeTo: _this.route });
+                    }
+                });
             }
             else {
                 _this.submissionComplete = true;
@@ -6162,28 +7196,6 @@ var FormComponent = /** @class */ (function () {
             _this.error.emit(err);
         });
     };
-    FormComponent.ctorParameters = function () { return [
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"] },
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"] },
-        { type: _config__WEBPACK_IMPORTED_MODULE_4__["AppConfig"] },
-        { type: angular_formio_auth__WEBPACK_IMPORTED_MODULE_3__["FormioAuthService"] },
-        { type: ngx_toastr__WEBPACK_IMPORTED_MODULE_6__["ToastrService"] },
-        { type: _offline_offline_service__WEBPACK_IMPORTED_MODULE_7__["OfflineService"] }
-    ]; };
-    FormComponent = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Component"])({
-            selector: 'app-form',
-            template: __webpack_require__(/*! raw-loader!./form.component.html */ "./node_modules/raw-loader/index.js!./src/app/form/form.component.html"),
-            encapsulation: _angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewEncapsulation"].None,
-            styles: [__webpack_require__(/*! ./form.component.scss */ "./src/app/form/form.component.scss")]
-        }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"],
-            _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"],
-            _config__WEBPACK_IMPORTED_MODULE_4__["AppConfig"],
-            angular_formio_auth__WEBPACK_IMPORTED_MODULE_3__["FormioAuthService"],
-            ngx_toastr__WEBPACK_IMPORTED_MODULE_6__["ToastrService"],
-            _offline_offline_service__WEBPACK_IMPORTED_MODULE_7__["OfflineService"]])
-    ], FormComponent);
     return FormComponent;
 }());
 
@@ -6191,14 +7203,196 @@ var FormComponent = /** @class */ (function () {
 
 /***/ }),
 
-/***/ "./src/app/home/home.component.scss":
-/*!******************************************!*\
-  !*** ./src/app/home/home.component.scss ***!
-  \******************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
+/***/ "./src/app/form/thanks/thanks.component.ngfactory.js":
+/*!***********************************************************!*\
+  !*** ./src/app/form/thanks/thanks.component.ngfactory.js ***!
+  \***********************************************************/
+/*! exports provided: RenderType_ThanksComponent, View_ThanksComponent_0, View_ThanksComponent_Host_0, ThanksComponentNgFactory */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
 
-module.exports = "\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsImZpbGUiOiJzcmMvYXBwL2hvbWUvaG9tZS5jb21wb25lbnQuc2NzcyJ9 */"
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RenderType_ThanksComponent", function() { return RenderType_ThanksComponent; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_ThanksComponent_0", function() { return View_ThanksComponent_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_ThanksComponent_Host_0", function() { return View_ThanksComponent_Host_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ThanksComponentNgFactory", function() { return ThanksComponentNgFactory; });
+/* harmony import */ var _thanks_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./thanks.component.scss.shim.ngstyle */ "./src/app/form/thanks/thanks.component.scss.shim.ngstyle.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _thanks_component__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./thanks.component */ "./src/app/form/thanks/thanks.component.ts");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../config */ "./src/app/config.ts");
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+
+
+
+
+
+
+var styles_ThanksComponent = [_thanks_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__["styles"]];
+var RenderType_ThanksComponent = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵcrt"]({ encapsulation: 0, styles: styles_ThanksComponent, data: {} });
+
+function View_ThanksComponent_1(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "h3", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Thanks, your information has been submitted"]))], null, null); }
+function View_ThanksComponent_2(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "h3", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](1, null, ["", ""]))], null, function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.config.message; _ck(_v, 1, 0, currVal_0); }); }
+function View_ThanksComponent_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 7, "div", [["class", "jumbotron text-center"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_ThanksComponent_1)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](2, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_ThanksComponent_2)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](4, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_2__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](5, 0, null, null, 2, "button", [["class", "btn btn-lg btn-success"], ["routerLink", "../"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; if (("click" === en)) {
+        var pd_0 = (_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵnov"](_v, 6).onClick() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](6, 16384, null, 0, _angular_router__WEBPACK_IMPORTED_MODULE_3__["RouterLink"], [_angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_3__["ActivatedRoute"], [8, null], _angular_core__WEBPACK_IMPORTED_MODULE_1__["Renderer2"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"]], { routerLink: [0, "routerLink"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Back to Form"]))], function (_ck, _v) { var _co = _v.component; var currVal_0 = !_co.config.message; _ck(_v, 2, 0, currVal_0); var currVal_1 = _co.config.message; _ck(_v, 4, 0, currVal_1); var currVal_2 = "../"; _ck(_v, 6, 0, currVal_2); }, null); }
+function View_ThanksComponent_Host_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "app-thanks", [], null, null, null, View_ThanksComponent_0, RenderType_ThanksComponent)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 114688, null, 0, _thanks_component__WEBPACK_IMPORTED_MODULE_4__["ThanksComponent"], [_config__WEBPACK_IMPORTED_MODULE_5__["AppConfig"]], null, null)], function (_ck, _v) { _ck(_v, 1, 0); }, null); }
+var ThanksComponentNgFactory = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵccf"]("app-thanks", _thanks_component__WEBPACK_IMPORTED_MODULE_4__["ThanksComponent"], View_ThanksComponent_Host_0, {}, {}, []);
+
+
+
+/***/ }),
+
+/***/ "./src/app/form/thanks/thanks.component.scss.shim.ngstyle.js":
+/*!*******************************************************************!*\
+  !*** ./src/app/form/thanks/thanks.component.scss.shim.ngstyle.js ***!
+  \*******************************************************************/
+/*! exports provided: styles */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "styles", function() { return styles; });
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+var styles = ["\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsImZpbGUiOiJzcmMvYXBwL2Zvcm0vdGhhbmtzL3RoYW5rcy5jb21wb25lbnQuc2NzcyJ9 */"];
+
+
+
+/***/ }),
+
+/***/ "./src/app/form/thanks/thanks.component.ts":
+/*!*************************************************!*\
+  !*** ./src/app/form/thanks/thanks.component.ts ***!
+  \*************************************************/
+/*! exports provided: ThanksComponent */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ThanksComponent", function() { return ThanksComponent; });
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../config */ "./src/app/config.ts");
+
+var ThanksComponent = /** @class */ (function () {
+    function ThanksComponent(config) {
+        this.config = config;
+    }
+    ThanksComponent.prototype.ngOnInit = function () {
+    };
+    return ThanksComponent;
+}());
+
+
+
+/***/ }),
+
+/***/ "./src/app/home/home.component.ngfactory.js":
+/*!**************************************************!*\
+  !*** ./src/app/home/home.component.ngfactory.js ***!
+  \**************************************************/
+/*! exports provided: RenderType_HomeComponent, View_HomeComponent_0, View_HomeComponent_Host_0, HomeComponentNgFactory */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RenderType_HomeComponent", function() { return RenderType_HomeComponent; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_HomeComponent_0", function() { return View_HomeComponent_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "View_HomeComponent_Host_0", function() { return View_HomeComponent_Host_0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "HomeComponentNgFactory", function() { return HomeComponentNgFactory; });
+/* harmony import */ var _home_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./home.component.scss.shim.ngstyle */ "./src/app/home/home.component.scss.shim.ngstyle.js");
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/angular-formio/components/formio/formio.component.ngfactory */ "./node_modules/angular-formio/components/formio/formio.component.ngfactory.js");
+/* harmony import */ var angular_formio_components_formio_formio_component__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! angular-formio/components/formio/formio.component */ "./node_modules/angular-formio/components/formio/formio.component.js");
+/* harmony import */ var angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! angular-formio/components/loader/formio.loader */ "./node_modules/angular-formio/components/loader/formio.loader.js");
+/* harmony import */ var angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! angular-formio/formio.config */ "./node_modules/angular-formio/formio.config.js");
+/* harmony import */ var angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! angular-formio/custom-component/custom-tags.service */ "./node_modules/angular-formio/custom-component/custom-tags.service.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _home_component__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./home.component */ "./src/app/home/home.component.ts");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+
+
+
+
+
+
+
+
+
+
+
+var styles_HomeComponent = [_home_component_scss_shim_ngstyle__WEBPACK_IMPORTED_MODULE_0__["styles"]];
+var RenderType_HomeComponent = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵcrt"]({ encapsulation: 0, styles: styles_HomeComponent, data: {} });
+
+function View_HomeComponent_1(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "div", [["class", "alert alert-success"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](1, null, ["", ""]))], null, function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.alert; _ck(_v, 1, 0, currVal_0); }); }
+function View_HomeComponent_2(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "option", [], [[8, "value", 0]], null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](1, null, ["", ""]))], null, function (_ck, _v) { var currVal_0 = _v.context.$implicit.name; _ck(_v, 0, 0, currVal_0); var currVal_1 = _v.context.$implicit.label; _ck(_v, 1, 0, currVal_1); }); }
+function View_HomeComponent_3(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 10, "div", [["class", "input-group mt-3"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 3, "div", [["class", "input-group-prepend"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 2, "span", [["class", "input-group-text"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](3, 0, null, null, 1, "strong", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Share URL"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](5, 0, [[2, 0], ["copy", 1]], null, 0, "input", [["class", "form-control"], ["id", "copy"], ["name", "copy"], ["type", "text"]], [[8, "value", 0]], [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.copyToClipboard() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](6, 0, null, null, 4, "div", [["class", "input-group-append"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](7, 0, null, null, 1, "button", [["class", "btn btn-primary"], ["type", "button"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.copyToClipboard() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](8, 0, null, null, 0, "i", [["class", "fa fa-clipboard"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](9, 0, null, null, 1, "button", [["class", "btn btn-primary"], ["type", "button"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.gotoForm() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](10, 0, null, null, 0, "i", [["class", "fa fa-share"]], null, null, null, null, null))], null, function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.shareUrl; _ck(_v, 5, 0, currVal_0); }); }
+function View_HomeComponent_4(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 6, "div", [["class", "card bg-light mt-2"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](1, 0, null, null, 2, "div", [["class", "card-header"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 1, "h4", [["class", "card-title mb-0"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Form Preview"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](4, 0, null, null, 2, "div", [["class", "card-body"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](5, 0, null, null, 1, "formio", [], null, [[null, "formLoad"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("formLoad" === en)) {
+        var pd_0 = (_co.onFormLoad($event) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__["View_FormioComponent_0"], _node_modules_angular_formio_components_formio_formio_component_ngfactory__WEBPACK_IMPORTED_MODULE_2__["RenderType_FormioComponent"])), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](6, 770048, null, 0, angular_formio_components_formio_formio_component__WEBPACK_IMPORTED_MODULE_3__["FormioComponent"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["NgZone"], angular_formio_components_loader_formio_loader__WEBPACK_IMPORTED_MODULE_4__["FormioLoader"], [2, angular_formio_formio_config__WEBPACK_IMPORTED_MODULE_5__["FormioAppConfig"]], [2, angular_formio_custom_component_custom_tags_service__WEBPACK_IMPORTED_MODULE_6__["CustomTagsService"]]], { src: [0, "src"] }, { formLoad: "formLoad" })], function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.formSrc; _ck(_v, 6, 0, currVal_0); }, null); }
+function View_HomeComponent_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](402653184, 1, { formSrcField: 0 }), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵqud"](671088640, 2, { copy: 0 }), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](2, 0, null, null, 23, "div", [["class", "card bg-light src-form"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](3, 0, null, null, 22, "div", [["class", "card-body"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_HomeComponent_1)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](5, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](6, 0, null, null, 9, "div", [["class", "input-group"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](7, 0, null, null, 3, "div", [["class", "input-group-prepend"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](8, 0, null, null, 2, "label", [["class", "input-group-text"], ["for", "formsrc"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](9, 0, null, null, 1, "strong", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Form Embed URL"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](11, 0, [[1, 0], ["formsrc", 1]], null, 0, "input", [["class", "form-control"], ["id", "formsrc"], ["name", "formsrc"], ["placeholder", "https://examples.form.io/example"], ["type", "text"]], null, [[null, "input"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("input" === en)) {
+        var pd_0 = (_co.onChange($event) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](12, 0, null, null, 3, "div", [["class", "input-group-append"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](13, 0, null, null, 2, "button", [["class", "btn btn-primary"]], null, [[null, "click"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("click" === en)) {
+        var pd_0 = (_co.showForm() !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](14, 0, null, null, 0, "span", [["class", "fa fa-check-square-o"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, [" Show Form"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](16, 0, null, null, 7, "div", [["class", "input-group mt-3"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](17, 0, null, null, 3, "div", [["class", "input-group-prepend"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](18, 0, null, null, 2, "label", [["class", "input-group-text"], ["for", "themeSelect"]], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](19, 0, null, null, 1, "strong", [], null, null, null, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵted"](-1, null, ["Theme"])), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](21, 0, null, null, 2, "select", [["class", "custom-select"], ["id", "themeSelect"]], null, [[null, "change"]], function (_v, en, $event) { var ad = true; var _co = _v.component; if (("change" === en)) {
+        var pd_0 = (_co.onTheme($event) !== false);
+        ad = (pd_0 && ad);
+    } return ad; }, null, null)), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_HomeComponent_2)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](23, 278528, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgForOf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["IterableDiffers"]], { ngForOf: [0, "ngForOf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_HomeComponent_3)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](25, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null), (_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵand"](16777216, null, null, 1, null, View_HomeComponent_4)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](27, 16384, null, 0, _angular_common__WEBPACK_IMPORTED_MODULE_7__["NgIf"], [_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewContainerRef"], _angular_core__WEBPACK_IMPORTED_MODULE_1__["TemplateRef"]], { ngIf: [0, "ngIf"] }, null)], function (_ck, _v) { var _co = _v.component; var currVal_0 = _co.alert; _ck(_v, 5, 0, currVal_0); var currVal_1 = _co.themes; _ck(_v, 23, 0, currVal_1); var currVal_2 = _co.shareUrl; _ck(_v, 25, 0, currVal_2); var currVal_3 = _co.formSrc; _ck(_v, 27, 0, currVal_3); }, null); }
+function View_HomeComponent_Host_0(_l) { return _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵvid"](0, [(_l()(), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵeld"](0, 0, null, null, 1, "app-home", [], null, null, null, View_HomeComponent_0, RenderType_HomeComponent)), _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵdid"](1, 114688, null, 0, _home_component__WEBPACK_IMPORTED_MODULE_8__["HomeComponent"], [_angular_router__WEBPACK_IMPORTED_MODULE_9__["Router"], _angular_router__WEBPACK_IMPORTED_MODULE_9__["ActivatedRoute"], _config__WEBPACK_IMPORTED_MODULE_10__["AppConfig"]], null, null)], function (_ck, _v) { _ck(_v, 1, 0); }, null); }
+var HomeComponentNgFactory = _angular_core__WEBPACK_IMPORTED_MODULE_1__["ɵccf"]("app-home", _home_component__WEBPACK_IMPORTED_MODULE_8__["HomeComponent"], View_HomeComponent_Host_0, {}, {}, []);
+
+
+
+/***/ }),
+
+/***/ "./src/app/home/home.component.scss.shim.ngstyle.js":
+/*!**********************************************************!*\
+  !*** ./src/app/home/home.component.scss.shim.ngstyle.js ***!
+  \**********************************************************/
+/*! exports provided: styles */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "styles", function() { return styles; });
+/**
+ * @fileoverview This file was generated by the Angular template compiler. Do not edit.
+ *
+ * @suppress {suspiciousCode,uselessCode,missingProperties,missingOverride,checkTypes}
+ * tslint:disable
+ */ 
+var styles = ["\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IiIsImZpbGUiOiJzcmMvYXBwL2hvbWUvaG9tZS5jb21wb25lbnQuc2NzcyJ9 */"];
+
+
 
 /***/ }),
 
@@ -6212,11 +7406,9 @@ module.exports = "\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "HomeComponent", function() { return HomeComponent; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
-
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
 
 
 
@@ -6253,16 +7445,17 @@ var HomeComponent = /** @class */ (function () {
     }
     HomeComponent.prototype.ngOnInit = function () {
         // If a src is provided, then we can navigate to the correct page.
+        this.config.reset();
         if (this.config.query.src) {
-            if (!_config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"].projectName) {
+            if (!_config__WEBPACK_IMPORTED_MODULE_2__["AppConfig"].projectName) {
                 this.alert = 'You must provide a project name within the url.';
                 return;
             }
-            if (!_config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"].formPath) {
+            if (!_config__WEBPACK_IMPORTED_MODULE_2__["AppConfig"].formPath) {
                 this.alert = 'You must provide a Form embed URL to display a form.';
                 return;
             }
-            this.router.navigate([_config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"].projectName + "/" + _config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"].formPath], { relativeTo: this.route });
+            this.router.navigate([_config__WEBPACK_IMPORTED_MODULE_2__["AppConfig"].projectName + "/" + _config__WEBPACK_IMPORTED_MODULE_2__["AppConfig"].formPath], { relativeTo: this.route });
         }
     };
     HomeComponent.prototype.onTheme = function (event) {
@@ -6276,6 +7469,7 @@ var HomeComponent = /** @class */ (function () {
         this.shareUrl = location.origin + "/#/?src=" + encodeURIComponent(this.src) + "&theme=" + this.theme;
     };
     HomeComponent.prototype.gotoForm = function () {
+        this.config.reset();
         window.location.href = this.shareUrl;
         window.location.reload();
     };
@@ -6292,29 +7486,6 @@ var HomeComponent = /** @class */ (function () {
         document.execCommand("copy");
         this.alert = 'Copied to clipboard';
     };
-    HomeComponent.ctorParameters = function () { return [
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"] },
-        { type: _angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"] },
-        { type: _config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"] }
-    ]; };
-    tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewChild"])('formsrc', { static: true }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"])
-    ], HomeComponent.prototype, "formSrcField", void 0);
-    tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["ViewChild"])('copy', { static: true }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_1__["ElementRef"])
-    ], HomeComponent.prototype, "copy", void 0);
-    HomeComponent = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Component"])({
-            selector: 'app-home',
-            template: __webpack_require__(/*! raw-loader!./home.component.html */ "./node_modules/raw-loader/index.js!./src/app/home/home.component.html"),
-            styles: [__webpack_require__(/*! ./home.component.scss */ "./src/app/home/home.component.scss")]
-        }),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"],
-            _angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"],
-            _config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"]])
-    ], HomeComponent);
     return HomeComponent;
 }());
 
@@ -6332,13 +7503,11 @@ var HomeComponent = /** @class */ (function () {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OfflineService", function() { return OfflineService; });
-/* harmony import */ var tslib__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tslib */ "./node_modules/tslib/tslib.es6.js");
-/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
-/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! rxjs */ "./node_modules/rxjs/_esm5/index.js");
-/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
-
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var angular_formio__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! angular-formio */ "./node_modules/angular-formio/index.js");
+/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../config */ "./src/app/config.ts");
+/* harmony import */ var rxjs__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! rxjs */ "./node_modules/rxjs/_esm5/index.js");
+/* harmony import */ var ngx_toastr__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ngx-toastr */ "./node_modules/ngx-toastr/fesm5/ngx-toastr.js");
 
 
 
@@ -6354,20 +7523,20 @@ var OfflineService = /** @class */ (function () {
         this.sync = false;
         this.isOnline = true;
         this.isReady = false;
-        this.onlineChange = new _angular_core__WEBPACK_IMPORTED_MODULE_1__["EventEmitter"]();
+        this.onlineChange = new _angular_core__WEBPACK_IMPORTED_MODULE_0__["EventEmitter"]();
         this.offlineCount = 0;
         this.offlineOps = {};
         this.offlineSubmissions = [];
-        this.checkOnlineTimer = Object(rxjs__WEBPACK_IMPORTED_MODULE_4__["timer"])(1000, 1000);
+        this.checkOnlineTimer = Object(rxjs__WEBPACK_IMPORTED_MODULE_3__["timer"])(1000, 1000);
         this.offlinePlugin = appConfig.offlinePlugin = new FormioOfflineProject(appConfig.appUrl);
-        angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].registerPlugin(this.offlinePlugin, "offline-" + angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].namespace);
-        angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].events.on('offline.formError', function (err) {
+        angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].registerPlugin(this.offlinePlugin, "offline-" + angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].namespace);
+        angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].events.on('offline.formError', function (err) {
             _this.sync = false;
             _this.toastr.error(err);
         });
-        angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].events.on('offline.saveQueue', function () { return _this.updateOfflineCount(); });
-        angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].events.on('offline.queue', function () { return _this.updateOfflineCount(); });
-        angular_formio__WEBPACK_IMPORTED_MODULE_2__["Formio"].events.on('offline.queueEmpty', function () {
+        angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].events.on('offline.saveQueue', function () { return _this.updateOfflineCount(); });
+        angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].events.on('offline.queue', function () { return _this.updateOfflineCount(); });
+        angular_formio__WEBPACK_IMPORTED_MODULE_1__["Formio"].events.on('offline.queueEmpty', function () {
             _this.sync = false;
             _this.updateOfflineCount();
         });
@@ -6411,6 +7580,7 @@ var OfflineService = /** @class */ (function () {
         this.sync = true;
         this.offlinePlugin.ready.then(function () {
             _this.offlinePlugin.dequeueSubmissions();
+            _this.clearAll();
         });
     };
     OfflineService.prototype.checkOnlineStatus = function () {
@@ -6419,17 +7589,6 @@ var OfflineService = /** @class */ (function () {
         }
         this.isOnline = navigator.onLine;
     };
-    OfflineService.ctorParameters = function () { return [
-        { type: _config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"] },
-        { type: _angular_core__WEBPACK_IMPORTED_MODULE_1__["ApplicationRef"] },
-        { type: ngx_toastr__WEBPACK_IMPORTED_MODULE_5__["ToastrService"] }
-    ]; };
-    OfflineService = tslib__WEBPACK_IMPORTED_MODULE_0__["__decorate"]([
-        Object(_angular_core__WEBPACK_IMPORTED_MODULE_1__["Injectable"])(),
-        tslib__WEBPACK_IMPORTED_MODULE_0__["__metadata"]("design:paramtypes", [_config__WEBPACK_IMPORTED_MODULE_3__["AppConfig"],
-            _angular_core__WEBPACK_IMPORTED_MODULE_1__["ApplicationRef"],
-            ngx_toastr__WEBPACK_IMPORTED_MODULE_5__["ToastrService"]])
-    ], OfflineService);
     return OfflineService;
 }());
 
@@ -6475,17 +7634,17 @@ var environment = {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
-/* harmony import */ var _angular_platform_browser_dynamic__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/platform-browser-dynamic */ "./node_modules/@angular/platform-browser-dynamic/fesm5/platform-browser-dynamic.js");
-/* harmony import */ var _app_app_module__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./app/app.module */ "./src/app/app.module.ts");
-/* harmony import */ var _environments_environment__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./environments/environment */ "./src/environments/environment.ts");
+/* harmony import */ var _environments_environment__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./environments/environment */ "./src/environments/environment.ts");
+/* harmony import */ var _app_app_module_ngfactory__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./app/app.module.ngfactory */ "./src/app/app.module.ngfactory.js");
+/* harmony import */ var _angular_platform_browser__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/platform-browser */ "./node_modules/@angular/platform-browser/fesm5/platform-browser.js");
 
 
 
 
-if (_environments_environment__WEBPACK_IMPORTED_MODULE_3__["environment"].production) {
+if (_environments_environment__WEBPACK_IMPORTED_MODULE_1__["environment"].production) {
     Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["enableProdMode"])();
 }
-Object(_angular_platform_browser_dynamic__WEBPACK_IMPORTED_MODULE_1__["platformBrowserDynamic"])().bootstrapModule(_app_app_module__WEBPACK_IMPORTED_MODULE_2__["AppModule"])
+_angular_platform_browser__WEBPACK_IMPORTED_MODULE_3__["platformBrowser"]().bootstrapModuleFactory(_app_app_module_ngfactory__WEBPACK_IMPORTED_MODULE_2__["AppModuleNgFactory"])
     .catch(function (err) { return console.error(err); });
 
 
