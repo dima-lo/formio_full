@@ -102,6 +102,9 @@
   padding-left: 5px;
   padding-right: 5px; }
 
+.formio-tagpad-all-data {
+  white-space: pre-wrap; }
+
 .formio-tagpad-dot,
 .formio-tagpad-dot-index {
   cursor: pointer; }
