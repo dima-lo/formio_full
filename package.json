@@ -20,7 +20,7 @@
   },
   "cache": "1550086650",
   "main": "./server.js",
-  "version": "6.9.35",
+  "version": "6.9.36",
   "schema": "3.3.6",
   "portalVersion": "7.0.8",
   "dependencies": {
@@ -39,9 +39,9 @@
     "dotenv": "^6.2.0",
     "express": "^4.17.1",
     "express-cache-controller": "^1.1.0",
-    "formio": "^1.82.0",
+    "formio": "^1.83.0",
     "formio-services": "formio/formio-services#v2.0.2",
-    "formio-workers": "1.14.4",
+    "formio-workers": "1.14.7",
     "formiojs": "^4.9.26",
     "helmet": "^3.21.3",
     "is-url": "^1.2.4",
@@ -90,7 +90,7 @@
     "supertest": "^4.0.2",
     "uglify-es": "git+https://github.com/mishoo/UglifyJS2.git#harmony",
     "webpack": "^4.43.0",
-    "webpack-obfuscator": "^0.28.0"
+    "webpack-obfuscator": "^0.28.3"
   },
   "pre-commit": [
     "lint"
