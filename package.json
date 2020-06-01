@@ -20,9 +20,9 @@
   },
   "cache": "1550086650",
   "main": "./server.js",
-  "version": "6.9.36",
+  "version": "6.9.37",
   "schema": "3.3.6",
-  "portalVersion": "7.0.8",
+  "portalVersion": "7.0.8-1",
   "dependencies": {
     "JSONStream": "^1.3.5",
     "adal-node": "^0.2.1",
