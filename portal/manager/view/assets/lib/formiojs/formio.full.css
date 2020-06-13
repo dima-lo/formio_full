@@ -2764,6 +2764,12 @@ html.formio-dialog-open,
 body.formio-dialog-open {
   overflow: hidden; }
 
+.formio-dialog .tab-content {
+  padding-top: 12px; }
+
+.formio-dialog-close {
+  z-index: 1000; }
+
 @-webkit-keyframes formio-dialog-flyin {
   0% {
     opacity: 0;
@@ -3350,6 +3356,9 @@ div[data-oembed-url] {
   .formio-component-modal-wrapper .component-rendering-hidden {
     visibility: hidden; }
 
+div[read-only="true"] .formio-component-textarea div[ref="input"] {
+  white-space: pre-wrap; }
+
 .formbuilder {
   position: relative; }
 
@@ -3395,12 +3404,6 @@ div[data-oembed-url] {
 
 .form-builder-group-header {
   padding: 0; }
-
-.formio-dialog .tab-content {
-  padding-top: 12px; }
-
-.formio-dialog-close {
-  z-index: 1000; }
 
 .component-btn-group .component-settings-button {
   float: right;
@@ -3504,7 +3507,7 @@ div[data-oembed-url] {
   max-height: 100%; }
 
 .component-edit-container {
-  height: 100%;
+  height: auto;
   overflow: hidden; }
 
 .component-edit-content {
