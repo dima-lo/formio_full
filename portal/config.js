@@ -94,7 +94,7 @@ if (Formio) {
   }
 }
 angular.module('formioApp').constant('AppConfig', {
-  appVersion: '7.0.34',
+  appVersion: '7.0.35',
   copyrightYear: (new Date()).getFullYear().toString(),
   sso: sso,
   ssoTeamsEnabled: ssoTeamsEnabled,
