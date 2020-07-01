@@ -58,11 +58,16 @@ var appBase = protocol + '//' + window.location.host;
 var apiBase = apiProtocol + '//api.' + serverHost;
 var formioBase = apiProtocol + '//formio.' + serverHost;
 var pdfServer = apiProtocol + '//files.' + serverHost;
+var licenseServer = apiProtocol + '//license.' + serverHost;
 if (onPremise) {
   apiBase = apiProtocol + '//' + serverHost;
   formioBase = apiProtocol + '//' + serverHost + '/formio';
   pdfServer = hostedPDFServer || 'https://files.form.io';
+  licenseServer = 'https://license.form.io';
   pathType = 'Subdirectories';
+}
+if (host.indexOf('localhost') === 0) {
+  licenseServer = 'http://localhost:3006';
 }
 
 var disable = false;
@@ -89,7 +94,7 @@ if (Formio) {
   }
 }
 angular.module('formioApp').constant('AppConfig', {
-  appVersion: '7.0.19',
+  appVersion: '7.0.34',
   copyrightYear: (new Date()).getFullYear().toString(),
   sso: sso,
   ssoTeamsEnabled: ssoTeamsEnabled,
@@ -111,6 +116,7 @@ angular.module('formioApp').constant('AppConfig', {
   pdfHostedPrice: 50,
   pdfHostedForms: 25,
   pdfHostedSubs: 1000,
+  licenseServer: licenseServer,
   pdfEnterprisePrice: 250,
   tutorial: 'https://help.form.io/start/',
   userForm: formioBase + '/user',
