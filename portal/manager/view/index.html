@@ -8,9 +8,47 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1976d2">
-<link rel="stylesheet" href="styles.7dc5bbb0c21f4a19ad42.css"></head>
+  <style>
+    .formio-loader {
+      position: relative;
+      min-height: 60px;
+    }
+
+    .loader-wrapper {
+      z-index: 1000;
+      position:absolute;
+      top: 0px;
+      left: 0px;
+      bottom: 0px;
+      right: 0px;
+      background-color:rgba(0, 0, 0, 0.1);
+    }
+
+    .loader {
+      position:absolute;
+      left: 50%;
+      top: 50%;
+      margin-left: -30px;
+      margin-top: -30px;
+      z-index: 10000;
+      display: inline-block;
+      border: 6px solid #f3f3f3; /* Light grey */
+      border-top: 6px solid #3498db; /* Blue */
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+<link rel="stylesheet" href="styles.46377a3b5f6b7ff8c7e3.css"></head>
 <body>
+  <div id="loader" class="loader-wrapper"><div class="loader"></div></div>
   <app-root></app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
-<script src="runtime.6d740349dddbce6d25bc.js" defer></script><script src="polyfills-es5.68b83f18088e2473c5dd.js" nomodule defer></script><script src="polyfills.8bab00116357feac46b5.js" defer></script><script src="main.b9189b72602a50170c30.js" defer></script></body>
+<script src="runtime.498a55a87c179752d6b1.js" defer></script><script src="polyfills-es5.3f8dc2aa0102a29bdefc.js" nomodule defer></script><script src="polyfills.8bab00116357feac46b5.js" defer></script><script src="main.c527b9814358dbfc20fa.js" defer></script></body>
 </html>
